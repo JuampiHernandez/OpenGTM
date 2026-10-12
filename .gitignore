@@ -81,3 +81,6 @@ apps/searxng-pool/searxng-pool
 
 # Rust build artifacts
 /crates/target/
+
+# Turborepo writes agent rules at the repo root
+/AGENTS.md
