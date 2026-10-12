@@ -465,8 +465,12 @@ class LeadDB:
         if order_by not in allowed_orders:
             order_by = "score DESC"
 
+        # Unique id tiebreaker (same direction) keeps LIMIT/OFFSET pages
+        # deterministic when the sort column ties.
+        tiebreak = "l.id DESC" if order_by.endswith(" DESC") else "l.id ASC"
         rows = self.conn.execute(
-            f"SELECT * FROM leads l WHERE {where} ORDER BY {order_by} LIMIT ? OFFSET ?",
+            f"SELECT * FROM leads l WHERE {where} "
+            f"ORDER BY l.{order_by}, {tiebreak} LIMIT ? OFFSET ?",
             params + [limit, offset]
         ).fetchall()
 
@@ -536,7 +540,7 @@ class LeadDB:
         offset = (max(1, page) - 1) * max(1, page_size)
         rows = self.conn.execute(
             f"SELECT l.* FROM leads l WHERE {where} "
-            "ORDER BY l.score DESC LIMIT ? OFFSET ?",
+            "ORDER BY l.score DESC, l.id DESC LIMIT ? OFFSET ?",
             params + [max(1, page_size), offset],
         ).fetchall()
         return [dict(row) for row in rows], total
@@ -832,7 +836,7 @@ class LeadDB:
         """Get leads produced by a specific job."""
         rows = self.conn.execute(
             "SELECT * FROM leads WHERE collection_job_id = ? OR source = ? "
-            "ORDER BY score DESC LIMIT ?",
+            "ORDER BY score DESC, id DESC LIMIT ?",
             (job_id, f"job:{job_id}", limit)
         ).fetchall()
         return [dict(r) for r in rows]

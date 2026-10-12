@@ -304,7 +304,12 @@ class PgLeadStore:
             order = order_by if order_by in _ALLOWED_ORDERS else "score DESC"
             col, _, direction = order.partition(" ")
             order_col = getattr(LeadRow, col, LeadRow.score)
-            q = q.order_by(order_col.desc() if direction == "DESC" else order_col.asc())
+            # Unique id tiebreaker: without it, PostgreSQL may return tied rows
+            # in any order per query, so LIMIT/OFFSET pages overlap or skip.
+            if direction == "DESC":
+                q = q.order_by(order_col.desc(), LeadRow.id.desc())
+            else:
+                q = q.order_by(order_col.asc(), LeadRow.id.asc())
             rows = q.limit(limit).offset(offset).all()
             return [self._row_to_lead(r) for r in rows]
 
@@ -349,7 +354,8 @@ class PgLeadStore:
 
             total = q.count()
             rows = (
-                q.order_by(LeadRow.score.desc())
+                # id tiebreaker keeps OFFSET pages disjoint when scores tie.
+                q.order_by(LeadRow.score.desc(), LeadRow.id.desc())
                 .limit(max(1, page_size))
                 .offset((max(1, page) - 1) * max(1, page_size))
                 .all()
