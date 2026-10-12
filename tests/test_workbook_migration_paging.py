@@ -52,6 +52,35 @@ def test_migration_snapshots_all_pages(count):
         current_workspace_var.reset(token)
 
 
+def test_migration_with_tied_scores_snapshots_each_lead_once():
+    """Tied scores must not make OFFSET pages overlap or skip leads."""
+    workspace = "migration-ties-" + uuid.uuid4().hex
+    token = current_workspace_var.set(workspace)
+    ctx = WorkspaceCtx(user=None, workspace_id=workspace, slug=workspace)
+    count = 1001
+    try:
+        store = ctx.lead_db()
+        try:
+            ids = {store.upsert_lead(Lead(company=f"Tied {i}", city="Tie", score=7,
+                                          workspace_id=workspace)) for i in range(count)}
+        finally:
+            store.close()
+        with SessionLocal() as db:
+            wb = Workbook(name="Tied migration", workspace_id=workspace, source_type="leads_filter",
+                          filter_criteria={"city": "Tie"}, columns_config=[])
+            db.add(wb)
+            db.commit()
+            wid = wb.id
+            result = asyncio.run(migrate_workbook_to_v2(wid, db=db, ctx=ctx))
+        assert result["rows"] == count
+        with SessionLocal() as db:
+            lead_ids = [row.lead_id for row in db.query(WorkbookRow).filter_by(workbook_id=wid)]
+            assert len(lead_ids) == len(set(lead_ids)) == count
+            assert set(lead_ids) == ids
+    finally:
+        current_workspace_var.reset(token)
+
+
 @pytest.mark.parametrize("failure", ["raise", "empty"])
 def test_later_page_failure_rolls_back_snapshot(monkeypatch, failure):
     from apps.api.routers import workbooks

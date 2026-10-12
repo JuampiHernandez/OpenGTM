@@ -90,6 +90,26 @@ def test_workbook_query_contract_filters_and_pages(db):
     assert facets["total_leads"] == 2
 
 
+def test_tied_score_pages_return_each_lead_exactly_once(db):
+    # Every lead shares one score, so only the id tiebreaker orders the pages.
+    ids = {db.upsert_lead(Lead(workspace_id="w1", company=f"Tie {i}", city="Tie", score=50))
+           for i in range(1001)}
+    seen = []
+    page = 1
+    while True:
+        rows, total = db.query_leads_page({"city": "Tie"}, page=page, page_size=100)
+        if not rows:
+            break
+        seen.extend(row["id"] for row in rows)
+        page += 1
+    assert total == 1001
+    assert len(seen) == len(set(seen)) == 1001
+    assert set(seen) == ids
+    listed = [lead.id for offset in range(0, 1001, 100)
+              for lead in db.get_leads(workspace_id="w1", limit=100, offset=offset)]
+    assert len(listed) == len(set(listed)) == 1001
+
+
 def test_update_fields_cannot_change_identity_or_inject_column_names(db):
     lead_id = db.upsert_lead(Lead(
         workspace_id="w1", company="Alpha", city="Pune", score=10,
