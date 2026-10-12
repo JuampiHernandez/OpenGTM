@@ -137,7 +137,7 @@ async def update_email_data(
     if not record:
         raise HTTPException(status_code=404, detail=f"Record with id {id} not found")
 
-    update_data = data.dict(exclude_unset=True)
+    update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(record, key, value)
 

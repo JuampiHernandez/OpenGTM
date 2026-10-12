@@ -23,7 +23,7 @@ from apps.api.services.playbooks.models import PlaybookResult, PlaybookRun, Play
 
 
 def test_playbook_history_pages_are_stable_bounded_and_tenant_safe():
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     engine = create_engine(
         "sqlite:///:memory:",
@@ -35,7 +35,7 @@ def test_playbook_history_pages_are_stable_bounded_and_tenant_safe():
         tables=[Audience.__table__, ResearchPlaybook.__table__, PlaybookRun.__table__, PlaybookResult.__table__],
     )
     Session = sessionmaker(bind=engine)
-    created = datetime.utcnow() - timedelta(days=1)
+    created = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
     with Session() as db:
         db.add(Audience(id="aud", workspace_id="ws", name="Target", filters={}))
         db.add(Audience(id="other-aud", workspace_id="other", name="Other", filters={}))
