@@ -52,18 +52,18 @@ def _interval_minutes(policy: dict) -> Optional[int]:
     return INTERVAL_MINUTES.get(str(interval).lower())
 
 
-def _stale_row_ids(db, workbook_id: str, enrichment_cols: List[dict], ttl_map: dict) -> List[int]:
-    """Workbook row ids with an enrichment cell missing or older than its TTL."""
+def _stale_row_columns(db, workbook_id: str, enrichment_cols: List[dict], ttl_map: dict) -> dict[str, list[str]]:
+    """Exact enrichment cells missing, failed or older than their field's TTL."""
     rows = db.query(WorkbookRow).filter(WorkbookRow.workbook_id == workbook_id).all()
     if not rows:
-        return []
+        return {}
     # Legacy overlay keys follow the execution key (linked lead id or row id).
     overlays = db.query(WorkbookEnrichment).filter(
         WorkbookEnrichment.workbook_id == workbook_id
     ).all()
     seen = {(o.lead_id, o.column_id): o for o in overlays}
 
-    stale = set()
+    stale = {}
     now = _now()
     for row in rows:
         row_id = row.id
@@ -73,16 +73,17 @@ def _stale_row_ids(db, workbook_id: str, enrichment_cols: List[dict], ttl_map: d
             ttl_days = ttl_map.get(col.get("target_field") or cid, DEFAULT_STALENESS_DAYS)
             o = seen.get((lead_id, cid))
             if o is None or o.status != "complete":
-                stale.add(row_id)
-                break
+                stale.setdefault(str(row_id), []).append(cid)
+                continue
             upd = o.updated_at
             if upd is None:
-                stale.add(row_id); break
+                stale.setdefault(str(row_id), []).append(cid)
+                continue
             if upd.tzinfo is None:
                 upd = upd.replace(tzinfo=timezone.utc)
             if upd < now - timedelta(days=ttl_days):
-                stale.add(row_id); break
-    return list(stale)
+                stale.setdefault(str(row_id), []).append(cid)
+    return stale
 
 
 async def refresh_workbook(
@@ -103,7 +104,8 @@ async def refresh_workbook(
 
 async def _refresh_workbook_impl(workbook_id: str, reason: str, workspace_id: str) -> dict:
     from apps.api.services.workbook.source_engine import materialize_source
-    from apps.api.services.workbook.enrichment import run_workbook_enrichment
+    from apps.api.services.workbook.enrichment import ENRICHMENT_COL_TYPES, run_workbook_enrichment
+    from apps.api.services.workbook.column_deps import downstream_columns
 
     with SessionLocal() as db:
         wb = db.query(Workbook).filter(Workbook.id == workbook_id).first()
@@ -114,6 +116,9 @@ async def _refresh_workbook_impl(workbook_id: str, reason: str, workspace_id: st
         source_cols = [c for c in cols if c.get("type") == "source"]
         enrichment_cols = [c for c in cols if c.get("type") in ("enrichment", "waterfall", "ai_formula")]
         ttl_map = policy.get("staleness_ttl_days") or {}
+        previous_row_ids = {row.id for row in db.query(WorkbookRow.id).filter(
+            WorkbookRow.workbook_id == workbook_id
+        ).all()}
 
     # 1) Re-source (append-only via entity dedup)
     sourced = 0
@@ -121,12 +126,35 @@ async def _refresh_workbook_impl(workbook_id: str, reason: str, workspace_id: st
         res = await materialize_source(workbook_id, col["id"], workspace_id)
         sourced += res.get("added", 0)
 
-    # 2) Re-enrich stale rows only
+    # 2) Refresh stale cells and their reactive downstream dependencies.
+    def is_reactive(column: dict) -> bool:
+        return (
+            column.get("type") in ENRICHMENT_COL_TYPES
+            and column.get("reactive", column.get("type") != "output")
+        )
+
+    # Sourcing initializes every runnable cell, without dispatching outputs.
+    new_row_columns = [c["id"] for c in cols
+                       if c.get("id") and c.get("type") in ENRICHMENT_COL_TYPES
+                       and c.get("type") != "output"]
     reenriched = 0
     with SessionLocal() as db:
-        stale = _stale_row_ids(db, workbook_id, enrichment_cols, ttl_map) if enrichment_cols else []
+        stale = _stale_row_columns(db, workbook_id, enrichment_cols, ttl_map) if enrichment_cols else {}
+        added_row_ids = {row.id for row in db.query(WorkbookRow.id).filter(
+            WorkbookRow.workbook_id == workbook_id
+        ).all()} - previous_row_ids
+    for row_id, column_ids in stale.items():
+        dependents = downstream_columns(cols, set(column_ids), eligible=is_reactive)
+        stale[row_id] = list(dict.fromkeys([*column_ids, *(c["id"] for c in dependents if c.get("id"))]))
+    if new_row_columns:
+        for row_id in added_row_ids:
+            stale[str(row_id)] = list(new_row_columns)
     if stale:
-        result = await run_workbook_enrichment(workbook_id, row_ids=stale, workspace_id=workspace_id)
+        result = await run_workbook_enrichment(
+            workbook_id, row_ids=[int(row_id) for row_id in stale],
+            column_ids=list(dict.fromkeys(cid for ids in stale.values() for cid in ids)),
+            row_columns=stale, workspace_id=workspace_id,
+        )
         reenriched = result.get("completed", 0)
 
     with SessionLocal() as db:
