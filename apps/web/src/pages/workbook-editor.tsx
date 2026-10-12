@@ -9,8 +9,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect, useDeferredValue } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
-  useReactTable, getCoreRowModel, getSortedRowModel,
-  flexRender, type ColumnDef, type CellContext, type SortingState,
+  useTable, tableFeatures, createSortedRowModel, sortFns,
+  columnVisibilityFeature, rowSelectionFeature, rowSortingFeature,
+  flexRender, type ColumnDef, type CellContext, type RowSelectionState, type SortingState,
 } from "@tanstack/react-table"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { parseClipboardTable, serializeClipboardTable } from "@/lib/workbook-clipboard"
@@ -63,6 +64,17 @@ import {
   SortableContext, horizontalListSortingStrategy, useSortable,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+
+// TanStack Table v9 only exposes APIs for explicitly registered features.
+// The full built-in sort registry keeps v8's `"auto"` sortFn resolution.
+const workbookTableFeatures = tableFeatures({
+  columnVisibilityFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns,
+})
+type WorkbookTableFeatures = typeof workbookTableFeatures
 
 // ── Column Type Metadata ─────────────────────────────────────────────────
 
@@ -567,7 +579,7 @@ export default function WorkbookEditorPage() {
   const [newColLeadField, setNewColLeadField] = useState("")
   const [newColPrompt, setNewColPrompt] = useState("")
   const [newColCondition, setNewColCondition] = useState("")
-  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [allMatchingSelected, setAllMatchingSelected] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set())
@@ -812,8 +824,8 @@ export default function WorkbookEditorPage() {
 
   // ── Build TanStack Table columns ───────────────────────────────────────
 
-  const tableColumns = useMemo<ColumnDef<WorkbookLeadRow>[]>(() => {
-    const cols: ColumnDef<WorkbookLeadRow>[] = [
+  const tableColumns = useMemo<ColumnDef<WorkbookTableFeatures, WorkbookLeadRow>[]>(() => {
+    const cols: ColumnDef<WorkbookTableFeatures, WorkbookLeadRow>[] = [
       // Checkbox column
       {
         id: "_select",
@@ -828,7 +840,6 @@ export default function WorkbookEditorPage() {
             />
           </div>
         ),
-        size: 36,
         cell: ({ row }) => (
           <div className="flex items-center justify-center px-1">
             <input
@@ -845,7 +856,6 @@ export default function WorkbookEditorPage() {
       {
         id: "_index",
         header: "#",
-        size: 40,
         cell: ({ row }) => (
           <div className="flex items-center gap-1 px-1.5">
             <span className="text-[10px] text-muted-foreground tabular-nums">
@@ -904,7 +914,7 @@ export default function WorkbookEditorPage() {
               </div>
             )
           },
-          cell: ({ row }: CellContext<WorkbookLeadRow, unknown>) => {
+          cell: ({ row }: CellContext<WorkbookTableFeatures, WorkbookLeadRow, unknown>) => {
             // For lead_field columns (or legacy "input" type), get value from lead data
             if (col.type === "lead_field" || col.type === "input") {
               const leadField = col.lead_field || col.id
@@ -990,23 +1000,21 @@ export default function WorkbookEditorPage() {
               />
             )
           },
-        } satisfies ColumnDef<WorkbookLeadRow>
+        } satisfies ColumnDef<WorkbookTableFeatures, WorkbookLeadRow>
       }),
     ]
     return cols
   }, [columns, hiddenColumns, updateLeadField, updateWorkbookRow, runCell, cellRunPending, cellRunVariables])
 
-  const table = useReactTable({
+  // Search and saved-view filters are applied server-side before pagination, so
+  // the table registers no filtering feature; `globalFilter` stays page state.
+  const table = useTable({
+    features: workbookTableFeatures,
     data: viewRows,
     columns: tableColumns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    // Search and saved-view filters are already applied before server pagination.
-    manualFiltering: true,
-    state: { rowSelection, sorting, globalFilter },
+    state: { rowSelection, sorting },
     onRowSelectionChange: updater => { setAllMatchingSelected(false); setRowSelection(updater) },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
     getRowId: (row) => row.row_id != null ? `row:${row.row_id}` : `lead:${row.lead_id}`,
   })
 

@@ -2,15 +2,24 @@ import { useState, useRef, useEffect } from "react"
 import {
   type ColumnDef,
   type ColumnFiltersState,
+  type RowData,
   type SortingState,
-  type VisibilityState,
+  type ColumnVisibilityState,
   type RowSelectionState,
+  columnFilteringFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  createFilteredRowModel,
+  createPaginatedRowModel,
+  createSortedRowModel,
+  filterFns,
   flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  sortFns,
+  tableFeatures,
+  useTable,
 } from "@tanstack/react-table"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import {
@@ -27,8 +36,27 @@ import { ChevronLeft, ChevronRight, Columns3, Search } from "lucide-react"
 
 const ROW_HEIGHT = 36
 
-interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
+// TanStack Table v9 only exposes APIs for explicitly registered features.
+// The full built-in filter/sort registries keep v8's `"auto"` fn resolution.
+const dataTableFeatures = tableFeatures({
+  columnFilteringFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  filteredRowModel: createFilteredRowModel(),
+  sortedRowModel: createSortedRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+  filterFns,
+  sortFns,
+})
+
+export type DataTableFeatures = typeof dataTableFeatures
+export type DataTableColumnDef<TData extends RowData> = ColumnDef<DataTableFeatures, TData>
+
+interface DataTableProps<TData extends RowData> {
+  columns: DataTableColumnDef<TData>[]
   data: TData[]
   searchKey?: string
   searchPlaceholder?: string
@@ -38,12 +66,12 @@ interface DataTableProps<TData, TValue> {
   enableSelection?: boolean
   onSelectionChange?: (selectedRows: TData[]) => void
   /** Default visibility for columns (e.g. hide rich/optional columns by default). */
-  initialColumnVisibility?: VisibilityState
+  initialColumnVisibility?: ColumnVisibilityState
   /** localStorage key to persist column visibility across reloads. */
   columnVisibilityKey?: string
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends RowData>({
   columns,
   data,
   searchKey,
@@ -55,10 +83,10 @@ export function DataTable<TData, TValue>({
   onSelectionChange,
   initialColumnVisibility,
   columnVisibilityKey,
-}: DataTableProps<TData, TValue>) {
+}: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>(() => {
     if (columnVisibilityKey) {
       try {
         const saved = localStorage.getItem(columnVisibilityKey)
@@ -86,7 +114,7 @@ export function DataTable<TData, TValue>({
     ? [
         {
           id: "select",
-          header: ({ table: t }: { table: ReturnType<typeof useReactTable<TData>> }) => (
+          header: ({ table: t }) => (
             <Checkbox
               checked={t.getIsAllPageRowsSelected()}
               onCheckedChange={(value) => t.toggleAllPageRowsSelected(!!value)}
@@ -94,7 +122,7 @@ export function DataTable<TData, TValue>({
               className="translate-y-[2px]"
             />
           ),
-          cell: ({ row }: { row: { getIsSelected: () => boolean; toggleSelected: (v: boolean) => void } }) => (
+          cell: ({ row }) => (
             <Checkbox
               checked={row.getIsSelected()}
               onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -106,19 +134,18 @@ export function DataTable<TData, TValue>({
           enableSorting: false,
           enableHiding: false,
           size: 32,
-        } as ColumnDef<TData, TValue>,
+        } satisfies DataTableColumnDef<TData>,
         ...columns,
       ]
     : columns
 
-  const table = useReactTable({
+  const table = useTable({
+    features: dataTableFeatures,
     data,
     columns: allColumns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    // Only use pagination model if NOT virtualizing
-    ...(enableVirtualization ? {} : { getPaginationRowModel: getPaginationRowModel() }),
+    // Only paginate client-side when NOT virtualizing. Manual pagination passes
+    // every row through, matching v8 without a pagination row model.
+    manualPagination: enableVirtualization,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: (updater) => {
@@ -143,7 +170,7 @@ export function DataTable<TData, TValue>({
       }
     },
     initialState: {
-      pagination: { pageSize },
+      pagination: { pageIndex: 0, pageSize },
     },
     state: {
       sorting,
@@ -319,7 +346,7 @@ export function DataTable<TData, TValue>({
               Previous
             </Button>
             <div className="text-xs text-muted-foreground">
-              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+              Page {table.state.pagination.pageIndex + 1} of {table.getPageCount()}
             </div>
             <Button
               variant="outline"
