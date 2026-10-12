@@ -101,3 +101,92 @@ def test_all_fresh_cells_make_refresh_a_noop(refresh_runner, linked):
     result = asyncio.run(refresh.refresh_workbook(wid, workspace_id="refresh-scope"))
     assert result == {"sourced": 0, "reenriched": 0, "stale_rows": 0}
     assert calls == sent == []
+
+
+def test_refresh_recomputes_transitive_dependents_without_unrelated_spend(refresh_runner):
+    sessions, now, calls, sent = refresh_runner
+    columns = [
+        {"id": "email", "type": "input"},
+        {"id": "summary", "type": "ai_formula", "prompt": "summary {email}"},
+        {"id": "derived", "type": "formula", "formula": "{summary}"},
+        {"id": "final", "type": "ai_formula", "prompt": "final {derived}"},
+        {"id": "fresh", "type": "ai_formula", "prompt": "fresh {email}"},
+        {"id": "send", "type": "output", "destination": "sheets",
+         "destination_config": {"columns": ["summary"]}},
+    ]
+    with sessions() as db:
+        wb = Workbook(name="Refresh dependencies", workspace_id="refresh-scope", columns_config=columns)
+        db.add(wb)
+        db.flush()
+        wid = wb.id
+        row = WorkbookRow(id=101, workbook_id=wid, workspace_id="refresh-scope", position=0,
+                          data={"email": "dependent@example.test"})
+        db.add(row)
+        db.flush()
+        cells = {}
+        for cid in ("summary", "derived", "final", "fresh"):
+            cells[cid] = {"value": "OLD" if cid != "fresh" else "KEEP", "status": "complete"}
+            db.add(WorkbookEnrichment(workbook_id=wid, workspace_id="refresh-scope", lead_id=101,
+                                     column_id=cid, value=cells[cid]["value"], status="complete",
+                                     updated_at=now-timedelta(days=60) if cid == "summary" else now))
+        row.enrichments = cells
+        db.commit()
+    result = asyncio.run(refresh.refresh_workbook(wid, workspace_id="refresh-scope"))
+    with sessions() as db:
+        row = db.get(WorkbookRow, 101)
+        assert row.enrichments["derived"]["value"] == "UPDATED"
+        assert row.enrichments["final"]["value"] == "UPDATED"
+        assert row.enrichments["fresh"] == {"value": "KEEP", "status": "complete"}
+        assert "send" not in row.enrichments
+    assert [prompt for prompt, _email in calls] == ["summary {email}", "final {derived}"]
+    assert result == {"sourced": 0, "reenriched": 3, "stale_rows": 1}
+    assert sent == []
+
+
+def test_new_source_row_runs_every_runnable_column_without_dispatch(refresh_runner, monkeypatch):
+    from apps.api.services.workbook import source_engine, http_column, research_column, agent_column
+    sessions, now, calls, sent = refresh_runner
+    columns = [
+        {"id": "source", "type": "source"},
+        {"id": "email", "type": "input"},
+        {"id": "formula", "type": "formula", "formula": "{email}"},
+        {"id": "http", "type": "http", "url": "https://owned.example.test"},
+        {"id": "agent", "type": "agent"},
+        {"id": "research", "type": "research", "prompt": "research {email}"},
+        {"id": "send", "type": "output", "destination": "sheets",
+         "destination_config": {"columns": ["email"]}},
+    ]
+    with sessions() as db:
+        wb = Workbook(name="Freshly sourced", workspace_id="refresh-scope", columns_config=columns)
+        db.add(wb)
+        db.flush()
+        wid = wb.id
+        # Existing rows must not acquire unrelated missing runner cells.
+        db.add(WorkbookRow(id=101, workbook_id=wid, workspace_id="refresh-scope", position=0,
+                           data={"email": "existing@example.test"}))
+        db.commit()
+    async def source(_workbook_id, _column_id, _workspace_id):
+        with sessions() as db:
+            db.add(WorkbookRow(id=202, workbook_id=wid, workspace_id="refresh-scope", position=1,
+                               data={"email": "new@example.test"}))
+            db.commit()
+        return {"added": 1}
+    async def http(*args, **kwargs):
+        return {"value": "HTTP", "error": None}
+    async def research(*args, **kwargs):
+        return {"value": "RESEARCH", "error": None}
+    async def agent(*args, **kwargs):
+        return {"value": "AGENT", "error": None}
+    monkeypatch.setattr(source_engine, "materialize_source", source)
+    monkeypatch.setattr(http_column, "execute_http_column", http)
+    monkeypatch.setattr(research_column, "execute_research_column", research)
+    monkeypatch.setattr(agent_column, "run_agent_cell", agent)
+    result = asyncio.run(refresh.refresh_workbook(wid, workspace_id="refresh-scope"))
+    with sessions() as db:
+        added = db.get(WorkbookRow, 202)
+        assert {cid: added.enrichments[cid]["value"] for cid in ("formula", "http", "agent", "research")} == {
+            "formula": "new@example.test", "http": "HTTP", "agent": "AGENT", "research": "RESEARCH"}
+        assert db.get(WorkbookRow, 101).enrichments == {}
+        assert "send" not in added.enrichments
+    assert result == {"sourced": 1, "reenriched": 4, "stale_rows": 1}
+    assert sent == calls == []
