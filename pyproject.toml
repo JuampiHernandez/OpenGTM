@@ -90,6 +90,11 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = ["--strict-markers"]
+filterwarnings = [
+    # Third-party: slowapi (latest release) still calls asyncio.iscoroutinefunction,
+    # deprecated in Python 3.14. Nothing to fix on our side.
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning:slowapi.*",
+]
 markers = [
     "live: opt-in tests that require real network services or credentials",
     "postgres: integration tests that require a PostgreSQL service",

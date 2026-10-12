@@ -157,7 +157,9 @@ def _debit_budget(db, workspace_id: str, *, poll_now: bool = False) -> tuple[int
         )
         row = db.execute(sql, {"ws": workspace_id, "day": today, "pn": 1 if poll_now else 0}).first()
         return int(row[0]), int(row[1])
-    # SQLite upsert
+    # SQLite upsert. Bind the day as an ISO string (what SQLAlchemy's Date type
+    # stores on SQLite) rather than relying on sqlite3's deprecated date adapter.
+    today = today.isoformat()
     sql = text(
         "INSERT INTO poll_budget_ledger (workspace_id, day, n, n_poll_now) "
         "VALUES (:ws, :day, 1, :pn) "
@@ -174,9 +176,10 @@ def _debit_budget(db, workspace_id: str, *, poll_now: bool = False) -> tuple[int
 
 def poll_now_quota_used(db, workspace_id: str) -> int:
     today = _utcnow().date()
+    day = today if _is_pg(db) else today.isoformat()
     rec = db.execute(
         text("SELECT n_poll_now FROM poll_budget_ledger WHERE workspace_id=:ws AND day=:day"),
-        {"ws": workspace_id, "day": today},
+        {"ws": workspace_id, "day": day},
     ).first()
     return int(rec[0]) if rec else 0
 
