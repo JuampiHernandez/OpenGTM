@@ -64,8 +64,10 @@ class RealStripeClient:
         event = self._stripe.Webhook.construct_event(
             payload, sig_header, self._webhook_secret
         )
-        # Newer SDK returns a StripeObject; normalize to a plain dict.
-        return dict(event)
+        # Newer SDK returns a StripeObject that is not iterable (``dict(event)``
+        # raises TypeError); ``to_dict()`` recursively converts nested objects
+        # such as ``data.object`` to plain dicts.
+        return event.to_dict()
 
 
 # ── Injection seam ───────────────────────────────────────────────────────────

@@ -150,3 +150,44 @@ def test_webhook_ignores_non_checkout_event(client):
     r = tc.post("/api/billing/webhook", json=event, headers={"stripe-signature": "x"})
     assert r.status_code == 200
     assert r.json()["status"] == "ignored"
+
+
+def test_real_stripe_client_construct_event_returns_plain_dict():
+    """Regression: the real SDK's ``Webhook.construct_event`` returns a
+    StripeObject that ``dict()`` cannot iterate (e.g. stripe 16.x). Exercise the REAL
+    SDK through ``RealStripeClient`` with a locally signed payload — no network.
+    """
+    import hashlib
+    import hmac
+    import json
+    import time
+
+    pytest.importorskip("stripe")
+
+    secret = "whsec_test_regression"
+    payload = json.dumps({
+        "id": "evt_test_1",
+        "object": "event",
+        "type": "checkout.session.completed",
+        "data": {"object": {
+            "id": "sess_real_sdk",
+            "object": "checkout.session",
+            "payment_status": "paid",
+            "metadata": {"workspace_id": WS, "credit_usd": "12.5"},
+        }},
+    }).encode()
+    ts = int(time.time())
+    sig = hmac.new(
+        secret.encode(), f"{ts}.".encode() + payload, hashlib.sha256
+    ).hexdigest()
+
+    real = stripe_client.RealStripeClient("sk_test_dummy", secret)
+    event = real.construct_event(payload, f"t={ts},v1={sig}")
+
+    assert type(event) is dict
+    assert type(event["data"]) is dict
+    obj = event["data"]["object"]
+    assert type(obj) is dict
+    assert type(obj["metadata"]) is dict
+    assert obj["id"] == "sess_real_sdk"
+    assert obj["metadata"]["credit_usd"] == "12.5"
