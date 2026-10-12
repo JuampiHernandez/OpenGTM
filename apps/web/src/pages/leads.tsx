@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
-import { type ColumnDef } from "@tanstack/react-table"
 import { toast } from "sonner"
 import {
   ArrowUpDown, Mail, Phone, MoreHorizontal,
@@ -25,7 +24,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { DataTable } from "@/components/data-table"
+import { DataTable, type DataTableColumnDef } from "@/components/data-table"
 import { useLeads, useStats, useFilters, useUpdateStatus, useUpdateLead, useDeleteLead, useCollect, useAudiences, useCreateAudience, useDeleteAudience } from "@/lib/hooks"
 import {
   exportCSVUrl, fetchSimilarLeads, runDedup, mergeDuplicates, bulkEnrich,
@@ -134,7 +133,7 @@ export default function LeadsPage() {
   const deleteLeadMut = useDeleteLead()
   const collect = useCollect()
 
-  const columns: ColumnDef<Lead>[] = useMemo(() => [
+  const columns: DataTableColumnDef<Lead>[] = useMemo(() => [
     {
       accessorKey: "score",
       header: ({ column }) => (
