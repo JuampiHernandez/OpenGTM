@@ -166,3 +166,32 @@ def test_formula_dependencies_share_escaped_and_triple_quote_rules():
     formula = 'concat("escaped \\"{literal}\\"", """{multiline}\ntext""", { Owner\'s Name })'
     assert _refs_in({"formula": formula}) == {"Owner's Name"}
     assert _refs_in({"formula": "{self}"}) == {"self"}
+
+
+def test_structure_guards_preserve_stable_id_precedence_over_display_names():
+    from apps.api.services.workbook.column_deps import referencing_columns, broken_rename_references
+    columns = [
+        {"id": "display", "name": "source", "type": "input"},
+        {"id": "source", "name": "Real", "type": "input"},
+        {"id": "derived", "type": "formula", "formula": "{source}"},
+    ]
+    assert referencing_columns(columns, columns[0]) == []
+    assert referencing_columns(columns, columns[1]) == [columns[2]]
+    # Whole-config replacement checks retain the same ID authority.
+    assert referencing_columns(columns[1:], columns[0]) == []
+    renamed = [dict(column, name="Renamed") if column["id"] == "display"
+               else dict(column) for column in columns]
+    assert broken_rename_references(columns, renamed) == []
+
+
+def test_structure_guards_still_block_ambiguous_display_alias_retargeting():
+    from apps.api.services.workbook.column_deps import referencing_columns, broken_rename_references
+    columns = [
+        {"id": "first", "name": "Shared", "type": "input"},
+        {"id": "second", "name": "Shared", "type": "input"},
+        {"id": "derived", "type": "formula", "formula": "{Shared}"},
+    ]
+    assert referencing_columns(columns, columns[0]) == [columns[2]]
+    renamed = [dict(column, name="Renamed") if column["id"] == "first"
+               else dict(column) for column in columns]
+    assert broken_rename_references(columns, renamed) == [renamed[2]]

@@ -94,9 +94,14 @@ def referencing_columns(cols: List[dict], column: dict) -> List[dict]:
     """
     normalize = lambda value: str(value).strip().lower().replace("_", " ")
     aliases = {normalize(column[key]) for key in ("id", "name") if column.get(key)}
+    stable_ids = {candidate.get("id") for candidate in cols if candidate.get("id")}
     return [candidate for candidate in cols
             if candidate.get("id") != column.get("id")
-            and aliases.intersection(normalize(ref) for ref in _refs_in(candidate))]
+            and any(
+                (ref == column.get("id") if ref in stable_ids
+                 else normalize(ref) in aliases)
+                for ref in _refs_in(candidate)
+            )]
 
 
 def broken_rename_references(before: List[dict], after: List[dict]) -> List[dict]:
@@ -116,8 +121,12 @@ def broken_rename_references(before: List[dict], after: List[dict]) -> List[dict
         aliases = {normalize(column[key]) for key in ("id", "name") if column.get(key)}
         if name not in aliases:
             lost.add(name)
+    # Stable IDs take precedence over display aliases during execution. A
+    # retained ID cannot be broken by renaming another column's display name.
+    retained_ids = {column.get("id") for column in after if column.get("id")}
     return [column for column in after
-            if lost.intersection(normalize(ref) for ref in _refs_in(column))]
+            if any(ref not in retained_ids and normalize(ref) in lost
+                   for ref in _refs_in(column))]
 
 
 def cycle_blocked_columns(columns: List[dict]) -> set:
