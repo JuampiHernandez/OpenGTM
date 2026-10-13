@@ -1,0 +1,1066 @@
+{
+ "note": "Developer-laptop M0 baseline; regression reference only, not capacity claims.",
+ "runs": [
+  {
+   "schema_version": 1,
+   "benchmark": "enrichment_completion",
+   "label": "N=500 fixed 50ms defaults",
+   "ok": true,
+   "started_at": "2026-10-13T18:16:49.404116+00:00",
+   "identity": {
+    "git": {
+     "commit": "9188fc4d040c186f3495902fe77e0d041deba3bd",
+     "branch": "worktree-agent-aa4aceef986fd2e13",
+     "dirty": false
+    },
+    "hardware": {
+     "cpu_model": "Apple M2",
+     "physical_cores": 8,
+     "logical_cores": 8,
+     "ram_gb": 16.0,
+     "os": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+     "machine": "arm64"
+    },
+    "python": {
+     "version": "3.14.5",
+     "implementation": "CPython"
+    },
+    "database": {
+     "dialect": "sqlite",
+     "version": "3.50.4",
+     "location": "temporary file"
+    },
+    "redis": {
+     "reachable": true
+    },
+    "worker_config": {
+     "worker_concurrency": 1,
+     "max_active_per_workspace": 2,
+     "worker_processes": 1,
+     "heartbeat_interval_seconds": 30,
+     "run_workbook_timeout_seconds": 1800,
+     "row_concurrency": 12,
+     "provider_workers": 8,
+     "provider_timeout_seconds": 10,
+     "max_providers": 8,
+     "retry_passes": 1
+    },
+    "workload": {
+     "rows": 500,
+     "workbooks": 1,
+     "workspaces": 1,
+     "columns": [
+      {
+       "type": "enrichment",
+       "provider": "bench_simulator",
+       "path": "declarative manifest -> pebble provider worker -> httpx"
+      }
+     ],
+     "cost_per_lookup": 0.0,
+     "simulator": {
+      "seed": 42,
+      "latency_ms": 50.0,
+      "latency_dist": "fixed",
+      "jitter_ms": 0.0,
+      "sigma": 0.25,
+      "error_rate": 0.0,
+      "rate_429": 0.0
+     }
+    }
+   },
+   "results": {
+    "timed_out": false,
+    "jobs": {
+     "count": 1,
+     "statuses": {
+      "completed": 1
+     },
+     "retries": 0,
+     "errors": []
+    },
+    "cells": {
+     "total": 500,
+     "completed": 500,
+     "statuses": {
+      "complete": 500
+     },
+     "errors": {},
+     "overlay_rows": 500,
+     "attempts_recorded": 500
+    },
+    "throughput": {
+     "completed_per_second": 70.14,
+     "completed_per_second_excluding_startup": 77.23
+    },
+    "latency_ms": {
+     "end_to_end": {
+      "count": 500,
+      "p50": 4227.2,
+      "p95": 6852.4,
+      "p99": 7121.2,
+      "max": 7128.4
+     },
+     "cell_execution": {
+      "count": 500,
+      "p50": 87.1,
+      "p95": 132.2,
+      "p99": 701.5,
+      "max": 725.1
+     },
+     "startup_to_first_cell": 653.8
+    },
+    "wall_seconds": {
+     "enqueue_to_last_cell": 7.128,
+     "enqueue_to_jobs_done": 7.476
+    },
+    "dialect": "sqlite"
+   },
+   "simulator_stats": {
+    "requests": 500,
+    "unique_keys": 500,
+    "retried_keys": 0,
+    "status_counts": {
+     "200": 500
+    },
+    "peak_in_flight": 8,
+    "uptime_seconds": 8.682
+   },
+   "resources": {
+    "harness_cpu_seconds": 1.12,
+    "children_cpu_seconds": 3.46,
+    "harness_peak_rss_mb": 170.5,
+    "largest_child_peak_rss_mb": 160.6,
+    "note": "children = job child + provider workers + simulator (reaped processes)"
+   }
+  },
+  {
+   "schema_version": 1,
+   "benchmark": "enrichment_completion",
+   "label": "N=2000 fixed 50ms defaults",
+   "ok": true,
+   "started_at": "2026-10-13T18:17:11.456626+00:00",
+   "identity": {
+    "git": {
+     "commit": "9188fc4d040c186f3495902fe77e0d041deba3bd",
+     "branch": "worktree-agent-aa4aceef986fd2e13",
+     "dirty": false
+    },
+    "hardware": {
+     "cpu_model": "Apple M2",
+     "physical_cores": 8,
+     "logical_cores": 8,
+     "ram_gb": 16.0,
+     "os": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+     "machine": "arm64"
+    },
+    "python": {
+     "version": "3.14.5",
+     "implementation": "CPython"
+    },
+    "database": {
+     "dialect": "sqlite",
+     "version": "3.50.4",
+     "location": "temporary file"
+    },
+    "redis": {
+     "reachable": true
+    },
+    "worker_config": {
+     "worker_concurrency": 1,
+     "max_active_per_workspace": 2,
+     "worker_processes": 1,
+     "heartbeat_interval_seconds": 30,
+     "run_workbook_timeout_seconds": 1800,
+     "row_concurrency": 12,
+     "provider_workers": 8,
+     "provider_timeout_seconds": 10,
+     "max_providers": 8,
+     "retry_passes": 1
+    },
+    "workload": {
+     "rows": 2000,
+     "workbooks": 1,
+     "workspaces": 1,
+     "columns": [
+      {
+       "type": "enrichment",
+       "provider": "bench_simulator",
+       "path": "declarative manifest -> pebble provider worker -> httpx"
+      }
+     ],
+     "cost_per_lookup": 0.0,
+     "simulator": {
+      "seed": 42,
+      "latency_ms": 50.0,
+      "latency_dist": "fixed",
+      "jitter_ms": 0.0,
+      "sigma": 0.25,
+      "error_rate": 0.0,
+      "rate_429": 0.0
+     }
+    }
+   },
+   "results": {
+    "timed_out": false,
+    "jobs": {
+     "count": 1,
+     "statuses": {
+      "completed": 1
+     },
+     "retries": 0,
+     "errors": []
+    },
+    "cells": {
+     "total": 2000,
+     "completed": 2000,
+     "statuses": {
+      "complete": 2000
+     },
+     "errors": {},
+     "overlay_rows": 2000,
+     "attempts_recorded": 2000
+    },
+    "throughput": {
+     "completed_per_second": 80.62,
+     "completed_per_second_excluding_startup": 82.9
+    },
+    "latency_ms": {
+     "end_to_end": {
+      "count": 2000,
+      "p50": 13248.3,
+      "p95": 23697.0,
+      "p99": 24587.4,
+      "max": 24807.5
+     },
+     "cell_execution": {
+      "count": 2000,
+      "p50": 85.3,
+      "p95": 129.6,
+      "p99": 138.9,
+      "max": 803.2
+     },
+     "startup_to_first_cell": 680.8
+    },
+    "wall_seconds": {
+     "enqueue_to_last_cell": 24.807,
+     "enqueue_to_jobs_done": 25.23
+    },
+    "dialect": "sqlite"
+   },
+   "simulator_stats": {
+    "requests": 2000,
+    "unique_keys": 2000,
+    "retried_keys": 0,
+    "status_counts": {
+     "200": 2000
+    },
+    "peak_in_flight": 8,
+    "uptime_seconds": 26.247
+   },
+   "resources": {
+    "harness_cpu_seconds": 1.17,
+    "children_cpu_seconds": 10.65,
+    "harness_peak_rss_mb": 172.2,
+    "largest_child_peak_rss_mb": 162.6,
+    "note": "children = job child + provider workers + simulator (reaped processes)"
+   }
+  },
+  {
+   "schema_version": 1,
+   "benchmark": "enrichment_completion",
+   "label": "N=2000 zero latency defaults (overhead ceiling)",
+   "ok": true,
+   "started_at": "2026-10-13T18:17:38.290665+00:00",
+   "identity": {
+    "git": {
+     "commit": "9188fc4d040c186f3495902fe77e0d041deba3bd",
+     "branch": "worktree-agent-aa4aceef986fd2e13",
+     "dirty": false
+    },
+    "hardware": {
+     "cpu_model": "Apple M2",
+     "physical_cores": 8,
+     "logical_cores": 8,
+     "ram_gb": 16.0,
+     "os": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+     "machine": "arm64"
+    },
+    "python": {
+     "version": "3.14.5",
+     "implementation": "CPython"
+    },
+    "database": {
+     "dialect": "sqlite",
+     "version": "3.50.4",
+     "location": "temporary file"
+    },
+    "redis": {
+     "reachable": true
+    },
+    "worker_config": {
+     "worker_concurrency": 1,
+     "max_active_per_workspace": 2,
+     "worker_processes": 1,
+     "heartbeat_interval_seconds": 30,
+     "run_workbook_timeout_seconds": 1800,
+     "row_concurrency": 12,
+     "provider_workers": 8,
+     "provider_timeout_seconds": 10,
+     "max_providers": 8,
+     "retry_passes": 1
+    },
+    "workload": {
+     "rows": 2000,
+     "workbooks": 1,
+     "workspaces": 1,
+     "columns": [
+      {
+       "type": "enrichment",
+       "provider": "bench_simulator",
+       "path": "declarative manifest -> pebble provider worker -> httpx"
+      }
+     ],
+     "cost_per_lookup": 0.0,
+     "simulator": {
+      "seed": 42,
+      "latency_ms": 0.0,
+      "latency_dist": "fixed",
+      "jitter_ms": 0.0,
+      "sigma": 0.25,
+      "error_rate": 0.0,
+      "rate_429": 0.0
+     }
+    }
+   },
+   "results": {
+    "timed_out": false,
+    "jobs": {
+     "count": 1,
+     "statuses": {
+      "completed": 1
+     },
+     "retries": 0,
+     "errors": []
+    },
+    "cells": {
+     "total": 2000,
+     "completed": 2000,
+     "statuses": {
+      "complete": 2000
+     },
+     "errors": {},
+     "overlay_rows": 2000,
+     "attempts_recorded": 2000
+    },
+    "throughput": {
+     "completed_per_second": 214.58,
+     "completed_per_second_excluding_startup": 230.53
+    },
+    "latency_ms": {
+     "end_to_end": {
+      "count": 2000,
+      "p50": 5346.8,
+      "p95": 8950.1,
+      "p99": 9243.0,
+      "max": 9320.7
+     },
+     "cell_execution": {
+      "count": 2000,
+      "p50": 40.4,
+      "p95": 47.4,
+      "p99": 93.8,
+      "max": 669.6
+     },
+     "startup_to_first_cell": 645.1
+    },
+    "wall_seconds": {
+     "enqueue_to_last_cell": 9.321,
+     "enqueue_to_jobs_done": 9.692
+    },
+    "dialect": "sqlite"
+   },
+   "simulator_stats": {
+    "requests": 2000,
+    "unique_keys": 2000,
+    "retried_keys": 0,
+    "status_counts": {
+     "200": 2000
+    },
+    "peak_in_flight": 1,
+    "uptime_seconds": 10.86
+   },
+   "resources": {
+    "harness_cpu_seconds": 1.1,
+    "children_cpu_seconds": 9.93,
+    "harness_peak_rss_mb": 172.1,
+    "largest_child_peak_rss_mb": 163.0,
+    "note": "children = job child + provider workers + simulator (reaped processes)"
+   }
+  },
+  {
+   "schema_version": 1,
+   "benchmark": "enrichment_completion",
+   "label": "N=2000 lognormal 50ms sigma0.5 1% 5xx 2% 429 defaults",
+   "ok": true,
+   "started_at": "2026-10-13T18:17:56.076757+00:00",
+   "identity": {
+    "git": {
+     "commit": "9188fc4d040c186f3495902fe77e0d041deba3bd",
+     "branch": "worktree-agent-aa4aceef986fd2e13",
+     "dirty": false
+    },
+    "hardware": {
+     "cpu_model": "Apple M2",
+     "physical_cores": 8,
+     "logical_cores": 8,
+     "ram_gb": 16.0,
+     "os": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+     "machine": "arm64"
+    },
+    "python": {
+     "version": "3.14.5",
+     "implementation": "CPython"
+    },
+    "database": {
+     "dialect": "sqlite",
+     "version": "3.50.4",
+     "location": "temporary file"
+    },
+    "redis": {
+     "reachable": true
+    },
+    "worker_config": {
+     "worker_concurrency": 1,
+     "max_active_per_workspace": 2,
+     "worker_processes": 1,
+     "heartbeat_interval_seconds": 30,
+     "run_workbook_timeout_seconds": 1800,
+     "row_concurrency": 12,
+     "provider_workers": 8,
+     "provider_timeout_seconds": 10,
+     "max_providers": 8,
+     "retry_passes": 1
+    },
+    "workload": {
+     "rows": 2000,
+     "workbooks": 1,
+     "workspaces": 1,
+     "columns": [
+      {
+       "type": "enrichment",
+       "provider": "bench_simulator",
+       "path": "declarative manifest -> pebble provider worker -> httpx"
+      }
+     ],
+     "cost_per_lookup": 0.0,
+     "simulator": {
+      "seed": 42,
+      "latency_ms": 50.0,
+      "latency_dist": "lognormal",
+      "jitter_ms": 0.0,
+      "sigma": 0.5,
+      "error_rate": 0.01,
+      "rate_429": 0.02
+     }
+    }
+   },
+   "results": {
+    "timed_out": false,
+    "jobs": {
+     "count": 1,
+     "statuses": {
+      "completed": 1
+     },
+     "retries": 0,
+     "errors": []
+    },
+    "cells": {
+     "total": 2000,
+     "completed": 1999,
+     "statuses": {
+      "complete": 1999,
+      "error": 1
+     },
+     "errors": {
+      "no_data": 1
+     },
+     "overlay_rows": 2000,
+     "attempts_recorded": 2061
+    },
+    "throughput": {
+     "completed_per_second": 61.7,
+     "completed_per_second_excluding_startup": 62.96
+    },
+    "latency_ms": {
+     "end_to_end": {
+      "count": 2000,
+      "p50": 16487.2,
+      "p95": 30489.8,
+      "p99": 32078.1,
+      "max": 32401.2
+     },
+     "cell_execution": {
+      "count": 2061,
+      "p50": 93.3,
+      "p95": 169.8,
+      "p99": 234.4,
+      "max": 677.4
+     },
+     "startup_to_first_cell": 649.9
+    },
+    "wall_seconds": {
+     "enqueue_to_last_cell": 32.401,
+     "enqueue_to_jobs_done": 32.873
+    },
+    "dialect": "sqlite"
+   },
+   "simulator_stats": {
+    "requests": 2061,
+    "unique_keys": 2000,
+    "retried_keys": 61,
+    "status_counts": {
+     "200": 1999,
+     "429": 38,
+     "500": 24
+    },
+    "peak_in_flight": 8,
+    "uptime_seconds": 33.852
+   },
+   "resources": {
+    "harness_cpu_seconds": 1.19,
+    "children_cpu_seconds": 11.61,
+    "harness_peak_rss_mb": 172.0,
+    "largest_child_peak_rss_mb": 163.0,
+    "note": "children = job child + provider workers + simulator (reaped processes)"
+   }
+  },
+  {
+   "schema_version": 1,
+   "benchmark": "enrichment_completion",
+   "label": "N=2000 fixed 50ms rows12 pw12",
+   "ok": true,
+   "started_at": "2026-10-13T18:39:07.360716+00:00",
+   "identity": {
+    "git": {
+     "commit": "9188fc4d040c186f3495902fe77e0d041deba3bd",
+     "branch": "worktree-agent-aa4aceef986fd2e13",
+     "dirty": true
+    },
+    "hardware": {
+     "cpu_model": "Apple M2",
+     "physical_cores": 8,
+     "logical_cores": 8,
+     "ram_gb": 16.0,
+     "os": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+     "machine": "arm64"
+    },
+    "python": {
+     "version": "3.14.5",
+     "implementation": "CPython"
+    },
+    "database": {
+     "dialect": "sqlite",
+     "version": "3.50.4",
+     "location": "temporary file"
+    },
+    "redis": {
+     "reachable": true
+    },
+    "worker_config": {
+     "worker_concurrency": 1,
+     "max_active_per_workspace": 2,
+     "worker_processes": 1,
+     "heartbeat_interval_seconds": 30,
+     "run_workbook_timeout_seconds": 1800,
+     "row_concurrency": 12,
+     "provider_workers": 12,
+     "provider_timeout_seconds": 10,
+     "max_providers": 8,
+     "retry_passes": 1
+    },
+    "workload": {
+     "rows": 2000,
+     "workbooks": 1,
+     "workspaces": 1,
+     "columns": [
+      {
+       "type": "enrichment",
+       "provider": "bench_simulator",
+       "path": "declarative manifest -> pebble provider worker -> httpx"
+      }
+     ],
+     "cost_per_lookup": 0.0,
+     "simulator": {
+      "seed": 42,
+      "latency_ms": 50.0,
+      "latency_dist": "fixed",
+      "jitter_ms": 0.0,
+      "sigma": 0.25,
+      "error_rate": 0.0,
+      "rate_429": 0.0
+     }
+    }
+   },
+   "results": {
+    "timed_out": false,
+    "jobs": {
+     "count": 1,
+     "statuses": {
+      "completed": 1
+     },
+     "retries": 0,
+     "errors": []
+    },
+    "cells": {
+     "total": 2000,
+     "completed": 2000,
+     "statuses": {
+      "complete": 2000
+     },
+     "errors": {},
+     "overlay_rows": 2000,
+     "attempts_recorded": 2000
+    },
+    "throughput": {
+     "completed_per_second": 112.92,
+     "completed_per_second_excluding_startup": 117.32
+    },
+    "latency_ms": {
+     "end_to_end": {
+      "count": 2000,
+      "p50": 9825.9,
+      "p95": 16947.9,
+      "p99": 17532.3,
+      "max": 17710.9
+     },
+     "cell_execution": {
+      "count": 2000,
+      "p50": 84.3,
+      "p95": 94.0,
+      "p99": 133.2,
+      "max": 960.3
+     },
+     "startup_to_first_cell": 662.9
+    },
+    "wall_seconds": {
+     "enqueue_to_last_cell": 17.711,
+     "enqueue_to_jobs_done": 18.03
+    },
+    "dialect": "sqlite"
+   },
+   "simulator_stats": {
+    "requests": 2000,
+    "unique_keys": 2000,
+    "retried_keys": 0,
+    "status_counts": {
+     "200": 2000
+    },
+    "peak_in_flight": 12,
+    "uptime_seconds": 19.424
+   },
+   "resources": {
+    "harness_cpu_seconds": 1.16,
+    "children_cpu_seconds": 9.89,
+    "harness_peak_rss_mb": 171.6,
+    "largest_child_peak_rss_mb": 161.9,
+    "note": "children = job child + provider workers + simulator (reaped processes)"
+   }
+  },
+  {
+   "schema_version": 1,
+   "benchmark": "enrichment_completion",
+   "label": "N=2000 fixed 50ms 4 workbooks/2 workspaces slots4",
+   "ok": true,
+   "started_at": "2026-10-13T18:39:27.383209+00:00",
+   "identity": {
+    "git": {
+     "commit": "9188fc4d040c186f3495902fe77e0d041deba3bd",
+     "branch": "worktree-agent-aa4aceef986fd2e13",
+     "dirty": true
+    },
+    "hardware": {
+     "cpu_model": "Apple M2",
+     "physical_cores": 8,
+     "logical_cores": 8,
+     "ram_gb": 16.0,
+     "os": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+     "machine": "arm64"
+    },
+    "python": {
+     "version": "3.14.5",
+     "implementation": "CPython"
+    },
+    "database": {
+     "dialect": "sqlite",
+     "version": "3.50.4",
+     "location": "temporary file"
+    },
+    "redis": {
+     "reachable": true
+    },
+    "worker_config": {
+     "worker_concurrency": 4,
+     "max_active_per_workspace": 2,
+     "worker_processes": 1,
+     "heartbeat_interval_seconds": 30,
+     "run_workbook_timeout_seconds": 1800,
+     "row_concurrency": 12,
+     "provider_workers": 8,
+     "provider_timeout_seconds": 10,
+     "max_providers": 8,
+     "retry_passes": 1
+    },
+    "workload": {
+     "rows": 2000,
+     "workbooks": 4,
+     "workspaces": 2,
+     "columns": [
+      {
+       "type": "enrichment",
+       "provider": "bench_simulator",
+       "path": "declarative manifest -> pebble provider worker -> httpx"
+      }
+     ],
+     "cost_per_lookup": 0.0,
+     "simulator": {
+      "seed": 42,
+      "latency_ms": 50.0,
+      "latency_dist": "fixed",
+      "jitter_ms": 0.0,
+      "sigma": 0.25,
+      "error_rate": 0.0,
+      "rate_429": 0.0
+     }
+    }
+   },
+   "results": {
+    "timed_out": false,
+    "jobs": {
+     "count": 4,
+     "statuses": {
+      "completed": 4
+     },
+     "retries": 0,
+     "errors": []
+    },
+    "cells": {
+     "total": 2000,
+     "completed": 2000,
+     "statuses": {
+      "complete": 2000
+     },
+     "errors": {},
+     "overlay_rows": 2000,
+     "attempts_recorded": 2000
+    },
+    "throughput": {
+     "completed_per_second": 189.23,
+     "completed_per_second_excluding_startup": 203.7
+    },
+    "latency_ms": {
+     "end_to_end": {
+      "count": 2000,
+      "p50": 6882.2,
+      "p95": 10063.1,
+      "p99": 10389.1,
+      "max": 10569.3
+     },
+     "cell_execution": {
+      "count": 2000,
+      "p50": 122.2,
+      "p95": 194.9,
+      "p99": 2481.9,
+      "max": 2527.5
+     },
+     "startup_to_first_cell": 751.0
+    },
+    "wall_seconds": {
+     "enqueue_to_last_cell": 10.569,
+     "enqueue_to_jobs_done": 10.976
+    },
+    "dialect": "sqlite"
+   },
+   "simulator_stats": {
+    "requests": 2000,
+    "unique_keys": 2000,
+    "retried_keys": 0,
+    "status_counts": {
+     "200": 2000
+    },
+    "peak_in_flight": 32,
+    "uptime_seconds": 12.141
+   },
+   "resources": {
+    "harness_cpu_seconds": 1.15,
+    "children_cpu_seconds": 14.88,
+    "harness_peak_rss_mb": 172.5,
+    "largest_child_peak_rss_mb": 161.0,
+    "note": "children = job child + provider workers + simulator (reaped processes)"
+   }
+  },
+  {
+   "schema_version": 1,
+   "benchmark": "enrichment_completion",
+   "label": "PG N=500",
+   "ok": true,
+   "started_at": "2026-10-13T18:39:47.061977+00:00",
+   "identity": {
+    "git": {
+     "commit": "9188fc4d040c186f3495902fe77e0d041deba3bd",
+     "branch": "worktree-agent-aa4aceef986fd2e13",
+     "dirty": true
+    },
+    "hardware": {
+     "cpu_model": "Apple M2",
+     "physical_cores": 8,
+     "logical_cores": 8,
+     "ram_gb": 16.0,
+     "os": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+     "machine": "arm64"
+    },
+    "python": {
+     "version": "3.14.5",
+     "implementation": "CPython"
+    },
+    "database": {
+     "dialect": "postgresql",
+     "version": "18.4 (Homebrew)",
+     "location": "caller-supplied"
+    },
+    "redis": {
+     "reachable": true
+    },
+    "worker_config": {
+     "worker_concurrency": 1,
+     "max_active_per_workspace": 2,
+     "worker_processes": 1,
+     "heartbeat_interval_seconds": 30,
+     "run_workbook_timeout_seconds": 1800,
+     "row_concurrency": 12,
+     "provider_workers": 8,
+     "provider_timeout_seconds": 10,
+     "max_providers": 8,
+     "retry_passes": 1
+    },
+    "workload": {
+     "rows": 500,
+     "workbooks": 1,
+     "workspaces": 1,
+     "columns": [
+      {
+       "type": "enrichment",
+       "provider": "bench_simulator",
+       "path": "declarative manifest -> pebble provider worker -> httpx"
+      }
+     ],
+     "cost_per_lookup": 0.0,
+     "simulator": {
+      "seed": 42,
+      "latency_ms": 50.0,
+      "latency_dist": "fixed",
+      "jitter_ms": 0.0,
+      "sigma": 0.25,
+      "error_rate": 0.0,
+      "rate_429": 0.0
+     }
+    }
+   },
+   "results": {
+    "timed_out": false,
+    "jobs": {
+     "count": 1,
+     "statuses": {
+      "completed": 1
+     },
+     "retries": 0,
+     "errors": []
+    },
+    "cells": {
+     "total": 500,
+     "completed": 500,
+     "statuses": {
+      "complete": 500
+     },
+     "errors": {},
+     "overlay_rows": 500,
+     "attempts_recorded": 500
+    },
+    "throughput": {
+     "completed_per_second": 45.05,
+     "completed_per_second_excluding_startup": 48.06
+    },
+    "latency_ms": {
+     "end_to_end": {
+      "count": 500,
+      "p50": 6204.0,
+      "p95": 10671.7,
+      "p99": 11098.6,
+      "max": 11099.2
+     },
+     "cell_execution": {
+      "count": 500,
+      "p50": 183.4,
+      "p95": 219.0,
+      "p99": 661.9,
+      "max": 721.9
+     },
+     "startup_to_first_cell": 695.2
+    },
+    "wall_seconds": {
+     "enqueue_to_last_cell": 11.099,
+     "enqueue_to_jobs_done": 11.415
+    },
+    "dialect": "postgresql"
+   },
+   "simulator_stats": {
+    "requests": 500,
+    "unique_keys": 500,
+    "retried_keys": 0,
+    "status_counts": {
+     "200": 500
+    },
+    "peak_in_flight": 8,
+    "uptime_seconds": 17.188
+   },
+   "resources": {
+    "harness_cpu_seconds": 1.53,
+    "children_cpu_seconds": 4.75,
+    "harness_peak_rss_mb": 188.8,
+    "largest_child_peak_rss_mb": 167.7,
+    "note": "children = job child + provider workers + simulator (reaped processes)"
+   }
+  },
+  {
+   "schema_version": 1,
+   "benchmark": "enrichment_completion",
+   "label": "PG N=2000",
+   "ok": true,
+   "started_at": "2026-10-13T18:40:09.865994+00:00",
+   "identity": {
+    "git": {
+     "commit": "9188fc4d040c186f3495902fe77e0d041deba3bd",
+     "branch": "worktree-agent-aa4aceef986fd2e13",
+     "dirty": true
+    },
+    "hardware": {
+     "cpu_model": "Apple M2",
+     "physical_cores": 8,
+     "logical_cores": 8,
+     "ram_gb": 16.0,
+     "os": "macOS-26.4.1-arm64-arm-64bit-Mach-O",
+     "machine": "arm64"
+    },
+    "python": {
+     "version": "3.14.5",
+     "implementation": "CPython"
+    },
+    "database": {
+     "dialect": "postgresql",
+     "version": "18.4 (Homebrew)",
+     "location": "caller-supplied"
+    },
+    "redis": {
+     "reachable": true
+    },
+    "worker_config": {
+     "worker_concurrency": 1,
+     "max_active_per_workspace": 2,
+     "worker_processes": 1,
+     "heartbeat_interval_seconds": 30,
+     "run_workbook_timeout_seconds": 1800,
+     "row_concurrency": 12,
+     "provider_workers": 8,
+     "provider_timeout_seconds": 10,
+     "max_providers": 8,
+     "retry_passes": 1
+    },
+    "workload": {
+     "rows": 2000,
+     "workbooks": 1,
+     "workspaces": 1,
+     "columns": [
+      {
+       "type": "enrichment",
+       "provider": "bench_simulator",
+       "path": "declarative manifest -> pebble provider worker -> httpx"
+      }
+     ],
+     "cost_per_lookup": 0.0,
+     "simulator": {
+      "seed": 42,
+      "latency_ms": 50.0,
+      "latency_dist": "fixed",
+      "jitter_ms": 0.0,
+      "sigma": 0.25,
+      "error_rate": 0.0,
+      "rate_429": 0.0
+     }
+    }
+   },
+   "results": {
+    "timed_out": false,
+    "jobs": {
+     "count": 1,
+     "statuses": {
+      "completed": 1
+     },
+     "retries": 0,
+     "errors": []
+    },
+    "cells": {
+     "total": 2000,
+     "completed": 2000,
+     "statuses": {
+      "complete": 2000
+     },
+     "errors": {},
+     "overlay_rows": 2000,
+     "attempts_recorded": 2000
+    },
+    "throughput": {
+     "completed_per_second": 37.79,
+     "completed_per_second_excluding_startup": 38.32
+    },
+    "latency_ms": {
+     "end_to_end": {
+      "count": 2000,
+      "p50": 20794.4,
+      "p95": 49864.8,
+      "p99": 52167.2,
+      "max": 52925.5
+     },
+     "cell_execution": {
+      "count": 2000,
+      "p50": 214.2,
+      "p95": 410.8,
+      "p99": 469.1,
+      "max": 904.2
+     },
+     "startup_to_first_cell": 735.6
+    },
+    "wall_seconds": {
+     "enqueue_to_last_cell": 52.926,
+     "enqueue_to_jobs_done": 53.276
+    },
+    "dialect": "postgresql"
+   },
+   "simulator_stats": {
+    "requests": 2000,
+    "unique_keys": 2000,
+    "retried_keys": 0,
+    "status_counts": {
+     "200": 2000
+    },
+    "peak_in_flight": 8,
+    "uptime_seconds": 54.341
+   },
+   "resources": {
+    "harness_cpu_seconds": 1.33,
+    "children_cpu_seconds": 21.01,
+    "harness_peak_rss_mb": 174.3,
+    "largest_child_peak_rss_mb": 168.2,
+    "note": "children = job child + provider workers + simulator (reaped processes)"
+   }
+  }
+ ]
+}
