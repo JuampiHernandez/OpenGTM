@@ -2845,3 +2845,27 @@ def test_duplicate_display_alias_rejects_ambiguous_public_reference(client, comp
         assert row.enrichments["result"]["status"] == "error"
         assert row.enrichments["result"]["error"] == "ambiguous_column_reference"
         assert row.enrichments["result"]["value"] is None
+
+
+@pytest.mark.parametrize("operation", ["delete", "rename", "replace"])
+def test_structure_edit_does_not_redirect_or_block_another_stable_id(client, operation):
+    tc, Session, _ = client
+    columns = [
+        {"id": "display", "name": "source", "type": "input", "width": 200},
+        {"id": "source", "name": "Actual source", "type": "input", "width": 200},
+        {"id": "derived", "name": "Derived", "type": "formula", "formula": "{source}", "width": 200},
+    ]
+    wid = _mk_workbook(Session, columns)
+    if operation == "delete":
+        response = tc.delete(f"/api/workbooks/{wid}/columns/display")
+    elif operation == "rename":
+        response = tc.patch(f"/api/workbooks/{wid}/columns/display/settings", json={
+            "changes": {"name": "Renamed"}, "expected": {"name": "source"}})
+    else:
+        response = tc.put(f"/api/workbooks/{wid}", json={"columns_config": columns[1:]})
+    assert response.status_code == 200, response.text
+    with Session() as db:
+        stored = db.get(Workbook, wid).columns_config
+        assert next(c for c in stored if c["id"] == "source") == columns[1]
+        assert next(c for c in stored if c["id"] == "derived")["formula"] == "{source}"
+        assert db.query(Job).count() == 0
