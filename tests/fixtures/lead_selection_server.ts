@@ -12,7 +12,8 @@ const selection=rows=>window.selected=rows.map(row=>row.id);
 const columns=[{accessorKey:'email',header:'Email'}];
 function Probe(){const [rows,setRows]=useState(initial);window.refresh=()=>flushSync(()=>setRows([...initial]));window.replace=()=>flushSync(()=>setRows([second,third]));return <DataTable columns={columns} data={rows} enableSelection enableVirtualization={false} onSelectionChange={selection}/>;}
 const root=createRoot(document.getElementById('root'));root.render(<Probe/>);
-window.unmount=()=>root.unmount();
+const emptyRoot=createRoot(document.getElementById('virtual-empty'));emptyRoot.render(<DataTable columns={columns} data={[]}/>);
+window.unmount=()=>{root.unmount();emptyRoot.unmount();};
 `);
 let result;
 try {result=await Bun.build({entrypoints:[entry],target:'browser'});} finally {await Bun.file(entry).delete();}
@@ -20,7 +21,7 @@ if(!result.success)throw new Error(String(result.logs));
 const bundle=await result.outputs[0].text();
 const server=Bun.serve({hostname:'127.0.0.1',port:0,fetch(req){
  if(new URL(req.url).pathname==='/bundle.js')return new Response(bundle,{headers:{'Content-Type':'application/javascript'}});
- return new Response('<style>[role=checkbox]{display:inline-block;width:20px;height:20px;border:1px solid black}</style><div id="root"></div><script type="module" src="/bundle.js"></script>',{headers:{'Content-Type':'text/html'}});
+ return new Response('<style>[role=checkbox]{display:inline-block;width:20px;height:20px;border:1px solid black}</style><div id="root"></div><div id="virtual-empty"></div><script type="module" src="/bundle.js"></script>',{headers:{'Content-Type':'text/html'}});
 }});
 console.log(JSON.stringify({port:server.port}));
 process.on('SIGTERM',()=>{server.stop(true);process.exit(0);});
