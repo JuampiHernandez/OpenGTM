@@ -147,6 +147,13 @@ async def lifespan(app: FastAPI):
     if run_inline_worker:
         await queue_service.stop_worker()
         print("✓ Queue Worker Stopped")
+    # Release pooled Tier-1 lead-gen HTTP clients (keep-alive connections).
+    try:
+        from apps.api.services.leadgen.http import aclose_plain_clients
+
+        await aclose_plain_clients()
+    except Exception:
+        logger.warning("Closing pooled leadgen HTTP clients failed", exc_info=True)
 
 
 app = FastAPI(title="OpenGTM", version="3.0.0", lifespan=lifespan)

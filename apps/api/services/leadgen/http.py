@@ -26,8 +26,12 @@ HTML bodies (JS-rendered shells that returned almost no content).
 """
 
 import asyncio
+import http.cookiejar
 import logging
 import re
+import weakref
+from collections import OrderedDict
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -178,6 +182,116 @@ _DEFAULT_HEADERS = {
     "Accept-Encoding": "gzip, deflate",
     "DNT": "1",
 }
+
+
+# ── Pooled Tier-1 httpx clients ──────────────────────────────────────
+#
+# ``_fetch_plain`` used to build (and tear down) a fresh ``httpx.AsyncClient``
+# per fetch, paying a new TCP/TLS handshake every time. Clients are now pooled
+# and reused, with these invariants:
+#
+#   * Keyed by event loop AND proxy. httpx clients are bound to the loop they
+#     were first used on, and the proxy is a client-level setting. Loops are
+#     held weakly so a finished loop (tests, ``asyncio.run`` in workers) drops
+#     its clients instead of handing them to a different loop.
+#   * Bounded: at most ``_MAX_PLAIN_CLIENTS`` per loop (LRU). An evicted client
+#     is closed once its in-flight requests finish.
+#   * Stateless across requests: the client's cookie jar rejects every cookie,
+#     so nothing a response sets can reach a later request (or another tenant /
+#     workspace). Cookies set during ONE fetch's redirect chain are carried in a
+#     per-fetch jar, matching the old per-call-client behaviour.
+#   * Security checks are unchanged: ``follow_redirects=False`` and
+#     ``check_url`` runs on every hop; timeouts are applied per request.
+
+_MAX_PLAIN_CLIENTS = 16
+
+
+class _RejectAllCookiesPolicy(http.cookiejar.DefaultCookiePolicy):
+    """Cookie policy that never stores or returns a cookie."""
+
+    def set_ok(self, cookie, request):
+        return False
+
+    def return_ok(self, cookie, request):
+        return False
+
+
+@dataclass
+class _PooledClient:
+    client: object
+    in_use: int = 0
+    evicted: bool = False
+
+
+_plain_clients: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, OrderedDict[str, _PooledClient]]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _new_plain_client(proxy: str | None):
+    import httpx
+
+    return httpx.AsyncClient(
+        headers=_DEFAULT_HEADERS,
+        follow_redirects=False,
+        proxy=proxy or None,
+        verify=True,
+        # Pass the raw CookieJar: httpx copies an ``httpx.Cookies`` argument into
+        # a fresh default-policy jar, which would silently drop the policy.
+        cookies=http.cookiejar.CookieJar(policy=_RejectAllCookiesPolicy()),
+    )
+
+
+@asynccontextmanager
+async def _plain_client(proxy: str | None):
+    """Borrow the pooled httpx client for (running loop, proxy)."""
+    loop = asyncio.get_running_loop()
+    pool = _plain_clients.get(loop)
+    if pool is None:
+        pool = OrderedDict()
+        _plain_clients[loop] = pool
+
+    key = proxy or ""
+    entry = pool.get(key)
+    if entry is None or entry.client.is_closed:
+        entry = _PooledClient(client=_new_plain_client(proxy))
+        pool[key] = entry
+        while len(pool) > _MAX_PLAIN_CLIENTS:
+            _, old = pool.popitem(last=False)
+            old.evicted = True
+            if old.in_use == 0:
+                await old.client.aclose()
+    else:
+        pool.move_to_end(key)
+
+    entry.in_use += 1
+    try:
+        yield entry.client
+    finally:
+        entry.in_use -= 1
+        if entry.evicted and entry.in_use == 0:
+            await entry.client.aclose()
+
+
+async def aclose_plain_clients() -> None:
+    """Close the pooled Tier-1 clients owned by the running event loop.
+
+    Call on app/worker shutdown. Clients of other (possibly closed) loops can't
+    be awaited from here; they are released when their loop is collected.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    pool = _plain_clients.pop(loop, None)
+    if not pool:
+        return
+    for entry in pool.values():
+        entry.evicted = True
+        try:
+            await entry.client.aclose()
+        except Exception:  # pragma: no cover - best-effort shutdown
+            logger.debug("error closing pooled httpx client", exc_info=True)
 
 
 class StealthClient:
@@ -422,17 +536,17 @@ class StealthClient:
         try:
             import httpx
 
-            async with httpx.AsyncClient(
-                headers=_DEFAULT_HEADERS,
-                timeout=timeout,
-                follow_redirects=False,
-                proxy=proxy or None,
-                verify=True,
-            ) as client:
+            async with _plain_client(proxy) as client:
+                # Per-fetch cookie jar: cookies set during this redirect chain
+                # are replayed within it, but never stored on the shared client.
+                fetch_cookies = httpx.Cookies()
                 current = url
                 for _hop in range(_MAX_REDIRECTS + 1):
                     check_url(current, allow_http=True, resolve=True)
-                    resp = await client.get(current)
+                    request = client.build_request("GET", current, timeout=timeout)
+                    fetch_cookies.set_cookie_header(request)
+                    resp = await client.send(request)
+                    fetch_cookies.extract_cookies(resp)
                     if resp.status_code not in (301, 302, 303, 307, 308):
                         break
                     location = resp.headers.get("location")
