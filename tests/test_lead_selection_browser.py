@@ -41,6 +41,8 @@ def test_lead_table_clears_selection_when_backing_records_change():
                 snapshot={'selected_ids':page.evaluate('selected'),'first_visible_lead':'second@example.test','checked':page.get_by_role('checkbox',name='Select row').first.is_checked(),'unchanged_rows_preserve_selection':unchanged,'errors':errors}
                 print(json.dumps(snapshot,indent=2))
                 assert snapshot['selected_ids']==[] and not snapshot['checked'] and unchanged and not errors
+                # Virtualized (default) table with no rows still renders its empty state.
+                page.locator('#virtual-empty').get_by_text('No results.',exact=True).wait_for(timeout=5000)
                 page.evaluate('unmount()')
             finally:browser.close()
     finally:

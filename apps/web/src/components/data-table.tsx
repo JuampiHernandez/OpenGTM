@@ -267,7 +267,7 @@ export function DataTable<TData extends RowData>({
             ))}
           </TableHeader>
           <TableBody>
-            {enableVirtualization && virtualRows ? (
+            {enableVirtualization && virtualRows && rows.length ? (
               <>
                 {/* Top spacer */}
                 {virtualRows.length > 0 && virtualRows[0].start > 0 && (
