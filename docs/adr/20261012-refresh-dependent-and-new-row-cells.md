@@ -38,6 +38,25 @@ writer during sourcing are left alone (covered by
 `test_concurrently_inserted_row_is_not_treated_as_sourced`). No extra row-ID
 queries are issued.
 
+## Addendum (2026-10-13): stale selection in bounded SQL (part of #33)
+
+Stale-cell selection no longer loads every workbook row and overlay into
+Python. `_stale_row_columns` keyset-paginates `workbook_rows.id` (page size
+`WORKBOOK_REFRESH_SCAN_BATCH_SIZE`, default 1000) and, per page, cross-joins
+the rows with the enrichment column ids (each carrying its own cutoff,
+`now - staleness_ttl_days[target_field or id]`, default 30 days) and LEFT JOINs
+`workbook_enrichments` on `(workbook_id, COALESCE(lead_id, id), column_id)`.
+Only stale pairs are returned: overlay missing, status not `complete` (NULL
+included), `updated_at` NULL, or `updated_at` older than the cutoff. Cutoffs
+are bound as naive UTC to match the naive-UTC `updated_at` column on both
+SQLite and PostgreSQL. Every page is scanned, so the selected cells are
+identical to the previous Python loop regardless of page size; it is a bound
+on per-query work, not a cap on refresh scope. Column entries without an id
+(malformed config) are skipped rather than reported as a `None` column.
+Parity against the previous implementation is covered by
+`tests/test_workbook_refresh_stale_sql.py` and, under FORCE RLS on
+PostgreSQL, `tests/test_workbook_refresh_stale_sql_pg.py`.
+
 ## Validation
 
 Python 3.12.3 and the repository's frozen uv dependencies: both new regressions

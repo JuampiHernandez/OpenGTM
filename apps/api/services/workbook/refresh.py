@@ -52,37 +52,93 @@ def _interval_minutes(policy: dict) -> Optional[int]:
     return INTERVAL_MINUTES.get(str(interval).lower())
 
 
-def _stale_row_columns(db, workbook_id: str, enrichment_cols: List[dict], ttl_map: dict) -> dict[str, list[str]]:
-    """Exact enrichment cells missing, failed or older than their field's TTL."""
-    rows = db.query(WorkbookRow).filter(WorkbookRow.workbook_id == workbook_id).all()
-    if not rows:
-        return {}
-    # Legacy overlay keys follow the execution key (linked lead id or row id).
-    overlays = db.query(WorkbookEnrichment).filter(
-        WorkbookEnrichment.workbook_id == workbook_id
-    ).all()
-    seen = {(o.lead_id, o.column_id): o for o in overlays}
+def _stale_row_columns(db, workbook_id: str, enrichment_cols: List[dict], ttl_map: dict,
+                       batch_size: Optional[int] = None) -> dict[str, list[str]]:
+    """Exact enrichment cells missing, failed or older than their field's TTL.
 
-    stale = {}
+    Selected in SQL, keyset-paginated over ``workbook_rows.id`` so a refresh
+    never loads the whole workbook (or its overlays) into Python. Each page
+    cross-joins the page's rows with the enrichment columns and LEFT JOINs the
+    overlay on the execution key (linked lead id, else row id); only stale
+    (row, column) pairs come back. A cell is stale when its overlay is missing,
+    its status is anything but ``complete`` (including NULL), its
+    ``updated_at`` is NULL, or ``updated_at`` is older than
+    ``now - staleness_ttl_days[target_field or id]`` (default 30 days).
+
+    Every page is scanned, so the result is independent of ``batch_size``.
+    Rows are returned in id order with columns in config order. Tenancy: the
+    explicit ``workbook_id`` filter plus RLS on both tables, as before.
+    """
+    from sqlalchemy import DateTime, Integer, String, and_, func, literal, or_, select, true, union_all
+
+    from apps.api.core.config import settings
+
+    # Column ids are NOT NULL on overlays; de-dup preserves config order (the
+    # caller de-dups the per-row lists anyway).
+    cutoffs: dict[str, datetime] = {}
     now = _now()
-    for row in rows:
-        row_id = row.id
-        lead_id = row.lead_id or row_id
-        for col in enrichment_cols:
-            cid = col.get("id")
-            ttl_days = ttl_map.get(col.get("target_field") or cid, DEFAULT_STALENESS_DAYS)
-            o = seen.get((lead_id, cid))
-            if o is None or o.status != "complete":
-                stale.setdefault(str(row_id), []).append(cid)
-                continue
-            upd = o.updated_at
-            if upd is None:
-                stale.setdefault(str(row_id), []).append(cid)
-                continue
-            if upd.tzinfo is None:
-                upd = upd.replace(tzinfo=timezone.utc)
-            if upd < now - timedelta(days=ttl_days):
-                stale.setdefault(str(row_id), []).append(cid)
+    for col in enrichment_cols:
+        cid = col.get("id")
+        if not cid or cid in cutoffs:
+            continue
+        ttl_days = ttl_map.get(col.get("target_field") or cid, DEFAULT_STALENESS_DAYS)
+        # Overlay timestamps are naive UTC (DateTime without tz on both
+        # dialects); compare naive UTC to avoid session-timezone coercion on
+        # PostgreSQL and offset-suffixed strings on SQLite.
+        cutoffs[cid] = (now - timedelta(days=ttl_days)).astimezone(timezone.utc).replace(tzinfo=None)
+    if not cutoffs:
+        return {}
+
+    columns = union_all(*(
+        select(literal(cid, String).label("cid"),
+               literal(ordinal, Integer).label("ord"),
+               literal(cutoff, DateTime()).label("cutoff"))
+        for ordinal, (cid, cutoff) in enumerate(cutoffs.items())
+    )).subquery("refresh_cols")
+
+    size = max(1, int(batch_size or settings.WORKBOOK_REFRESH_SCAN_BATCH_SIZE))
+    R, E = WorkbookRow, WorkbookEnrichment
+    stale: dict[str, list[str]] = {}
+    after = None
+    while True:
+        # Keyset page bounds: the next `size` row ids after the previous page.
+        page_q = select(R.id).where(R.workbook_id == workbook_id)
+        if after is not None:
+            page_q = page_q.where(R.id > after)
+        page = page_q.order_by(R.id).limit(size).subquery("refresh_page")
+        hi, count = db.execute(select(func.max(page.c.id), func.count())).one()
+        if not count:
+            break
+
+        in_page = [R.workbook_id == workbook_id, R.id <= hi]
+        if after is not None:
+            in_page.append(R.id > after)
+        overlay_on = and_(
+            E.workbook_id == workbook_id,
+            E.lead_id == func.coalesce(R.lead_id, R.id),
+            E.column_id == columns.c.cid,
+        )
+        rows = db.execute(
+            select(R.id, columns.c.cid)
+            .select_from(R)
+            .join(columns, true())
+            .outerjoin(E, overlay_on)
+            .where(*in_page)
+            .where(or_(
+                E.id.is_(None),
+                E.status.is_(None),
+                E.status != "complete",
+                E.updated_at.is_(None),
+                E.updated_at < columns.c.cutoff,
+            ))
+            .order_by(R.id, columns.c.ord)
+        ).all()
+        for row_id, cid in rows:
+            stale.setdefault(str(row_id), []).append(cid)
+
+        if count < size:
+            break
+        after = hi
     return stale
 
 

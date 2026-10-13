@@ -62,6 +62,7 @@ jobs:
           tests/test_entity_identity_pg.py
           tests/test_pg_tenancy_rls.py
           tests/test_lead_paging_pg.py
+          tests/test_workbook_refresh_stale_sql_pg.py
 
   frontend:
     name: Frontend lint, tests and build
