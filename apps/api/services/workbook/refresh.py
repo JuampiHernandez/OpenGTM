@@ -116,15 +116,16 @@ async def _refresh_workbook_impl(workbook_id: str, reason: str, workspace_id: st
         source_cols = [c for c in cols if c.get("type") == "source"]
         enrichment_cols = [c for c in cols if c.get("type") in ("enrichment", "waterfall", "ai_formula")]
         ttl_map = policy.get("staleness_ttl_days") or {}
-        previous_row_ids = {row.id for row in db.query(WorkbookRow.id).filter(
-            WorkbookRow.workbook_id == workbook_id
-        ).all()}
 
-    # 1) Re-source (append-only via entity dedup)
+    # 1) Re-source (append-only via entity dedup). Track exactly the rows our
+    # own sourcing inserted: rows added concurrently by other writers (CSV
+    # import, API insert, another job) must not get every column run here.
     sourced = 0
+    added_row_ids: list = []
     for col in source_cols:
         res = await materialize_source(workbook_id, col["id"], workspace_id)
         sourced += res.get("added", 0)
+        added_row_ids.extend(res.get("added_row_ids") or [])
 
     # 2) Refresh stale cells and their reactive downstream dependencies.
     def is_reactive(column: dict) -> bool:
@@ -140,14 +141,11 @@ async def _refresh_workbook_impl(workbook_id: str, reason: str, workspace_id: st
     reenriched = 0
     with SessionLocal() as db:
         stale = _stale_row_columns(db, workbook_id, enrichment_cols, ttl_map) if enrichment_cols else {}
-        added_row_ids = {row.id for row in db.query(WorkbookRow.id).filter(
-            WorkbookRow.workbook_id == workbook_id
-        ).all()} - previous_row_ids
     for row_id, column_ids in stale.items():
         dependents = downstream_columns(cols, set(column_ids), eligible=is_reactive)
         stale[row_id] = list(dict.fromkeys([*column_ids, *(c["id"] for c in dependents if c.get("id"))]))
     if new_row_columns:
-        for row_id in added_row_ids:
+        for row_id in dict.fromkeys(added_row_ids):
             stale[str(row_id)] = list(new_row_columns)
     if stale:
         result = await run_workbook_enrichment(
