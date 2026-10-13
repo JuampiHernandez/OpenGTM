@@ -2851,9 +2851,9 @@ def test_duplicate_display_alias_rejects_ambiguous_public_reference(client, comp
 def test_structure_edit_does_not_redirect_or_block_another_stable_id(client, operation):
     tc, Session, _ = client
     columns = [
-        {"id": "display", "name": "source", "type": "input"},
-        {"id": "source", "name": "Actual source", "type": "input"},
-        {"id": "derived", "name": "Derived", "type": "formula", "formula": "{source}"},
+        {"id": "display", "name": "source", "type": "input", "width": 200},
+        {"id": "source", "name": "Actual source", "type": "input", "width": 200},
+        {"id": "derived", "name": "Derived", "type": "formula", "formula": "{source}", "width": 200},
     ]
     wid = _mk_workbook(Session, columns)
     if operation == "delete":
