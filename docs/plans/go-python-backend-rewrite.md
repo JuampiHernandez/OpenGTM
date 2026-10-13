@@ -164,7 +164,7 @@ process termination and parent-side failure reconciliation.
 
 | Milestone | Deliverable | Exit gate |
 | --- | --- | --- |
-| M0: baseline | Fixed fixtures, provider simulator, representative workloads, resource profiles, and current queue/API measurements | Reproducible baseline with hardware, commit, configuration, and workload identity |
+| M0: baseline | Fixed fixtures, provider simulator, representative workloads, resource profiles, and current queue/API measurements ([harness and settings](../operations/worker-concurrency.md), [developer-laptop baseline](../benchmarks/enrichment-baseline.md)) | Reproducible baseline with hardware, commit, configuration, and workload identity |
 | M1: foundations | Go module, sqlc queries, versioned contracts, telemetry, additive executor routing/fencing, and Compose development setup | Python-only operation still passes; mixed-version claims, RLS, and lease recovery tests pass |
 | M2: one worker | One declarative HTTP enrichment job type in Go, including result/evidence persistence, billing coordination, and progress | Behavioral parity, crash/cancellation tests, benchmark comparison, feature flag, and exercised rollback |
 | M3: execution improvements | Bounded concurrency, transport pooling, shared limits, batching, and bounded workbook refresh queries | Measured improvement without degraded fairness, correctness, or resource bounds |
@@ -241,6 +241,10 @@ PostgreSQL correctness, or reproducible performance testing. Follow
 [CONTRIBUTING.md](../../CONTRIBUTING.md), including DCO sign-off.
 
 - [ ] Record M0 baseline and select the first enrichment job type.
+  - Harness, simulator, and a first developer-laptop baseline are in
+    [benchmarks/enrichment-baseline.md](../benchmarks/enrichment-baseline.md).
+    Still needed: a controlled-environment PostgreSQL baseline, API (k6)
+    measurements, and the first job type selection.
 - [ ] Define domain ownership, task contracts, executor routing, and lease fencing.
 - [ ] Add the Go development skeleton, pgx/sqlc access, and tenant transaction helper.
 - [ ] Preserve Python-only operation and exercise mixed-executor claims.
