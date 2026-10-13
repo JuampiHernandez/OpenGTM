@@ -76,7 +76,9 @@ async def materialize_source(
     ``workspace_id`` is the tenant this run belongs to. It arrives out-of-band
     (job payload / caller) — never read back off the workbook row — and binds the
     RLS scope for the whole run, so the wb/row reads and the lead-store read-back
-    are all tenant-correct. Returns a summary {found, added, skipped, query}.
+    are all tenant-correct. Returns a summary {found, added, skipped, query,
+    added_row_ids}; ``added_row_ids`` lists exactly the rows this run inserted
+    (absent on early-error returns, so callers should ``.get(..., [])``).
     """
     from apps.api.core.tenancy import workspace_scope
 
@@ -384,6 +386,7 @@ async def _materialize_source_impl(
         "shortfall": max(0, requested_count - total_rows_after),
         "found": found,
         "added": added,
+        "added_row_ids": list(_added_row_ids),
         "skipped": skipped,
         "rejected_by_reason": rejected_by_reason,
         "exhausted_sources": exhausted_sources,

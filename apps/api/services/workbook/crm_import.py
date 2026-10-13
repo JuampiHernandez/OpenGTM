@@ -222,4 +222,5 @@ async def materialize_crm_import(
         f"CRM import {workbook_id}/{column_id} ({crm}): "
         f"found={found} added={added} skipped={skipped}"
     )
-    return {"found": found, "added": added, "skipped": skipped, "crm": crm}
+    return {"found": found, "added": added, "skipped": skipped, "crm": crm,
+            "added_row_ids": list(_added_row_ids)}

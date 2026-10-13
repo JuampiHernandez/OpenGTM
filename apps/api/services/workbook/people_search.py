@@ -427,6 +427,7 @@ async def materialize_people_search(
     )
     result = {
         "found": found, "added": added, "skipped": skipped,
+        "added_row_ids": list(_added_row_ids),
         "companies": len(companies), "searches_used": searches_used,
         "search_failures": search_failures,
     }

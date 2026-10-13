@@ -174,10 +174,12 @@ def test_hubspot_import_paging_mapping_and_sync_key(db, monkeypatch, flag_on, hu
     col_id = _mk_workbook(db, source={"kind": "crm_import", "crm": "hubspot"})
 
     res = _run(se.materialize_source("wb1", col_id, WS_A))
+    added_ids = res.pop("added_row_ids")
     assert res == {"found": 3, "added": 3, "skipped": 0, "crm": "hubspot"}
     assert len(calls) == 2  # two pages
 
     rows = _rows(db)
+    assert added_ids == [r["id"] for r in rows]  # exactly the rows this run inserted
     assert [r["crm_external_id"] for r in rows] == ["1", "2", "3"]
     assert all(r["crm_type"] == "hubspot" and r["crm_object"] == "contact" for r in rows)
     assert rows[0]["email"] == "alice@x.com"
@@ -200,7 +202,7 @@ def test_hubspot_import_rerun_dedups_on_external_id(db, monkeypatch, flag_on, hu
     first = _run(se.materialize_source("wb1", col_id, WS_A))
     again = _run(se.materialize_source("wb1", col_id, WS_A))
     assert first["added"] == 3
-    assert again == {"found": 3, "added": 0, "skipped": 3, "crm": "hubspot"}
+    assert again == {"found": 3, "added": 0, "skipped": 3, "crm": "hubspot", "added_row_ids": []}
     assert len(_rows(db)) == 3
 
 
@@ -321,6 +323,7 @@ def test_salesforce_import_paging_filter_and_mapping(db, monkeypatch, flag_on, s
         "kind": "crm_import", "crm": "salesforce", "filter": "Email != null",
     })
     res = _run(se.materialize_source("wb1", col_id, WS_A))
+    assert len(res.pop("added_row_ids")) == 2
     assert res == {"found": 2, "added": 2, "skipped": 0, "crm": "salesforce"}
     assert seen["soql"].startswith(
         "SELECT Id, Email, FirstName, LastName, Account.Name, Phone, Title FROM Contact"

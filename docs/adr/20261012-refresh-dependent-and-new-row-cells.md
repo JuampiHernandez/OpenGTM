@@ -11,14 +11,18 @@ and research cells uninitialized.
 
 Expand each existing row's stale-cell scope through the existing transitive
 `downstream_columns` helper, using the row-edit path's reactive eligibility
-policy. Snapshot persisted row IDs before sourcing and compare them afterward.
-New rows initialize every runnable non-output column. Pass the resulting exact
+policy. The source engine reports the IDs of the rows each run inserted
+(`added_row_ids` in the `materialize_source` summary); those rows, and only
+those, initialize every runnable non-output column. Pass the resulting exact
 per-row scopes through the existing enrichment runner.
 
 ## Alternatives
 
-Returning added IDs from the source engine requires changing its return contract
-and each caller. Running all columns on every stale row would restore dependent
+The original version of this decision snapshotted persisted row IDs before
+sourcing and diffed afterward, avoiding a source-engine contract change. That
+misclassified rows inserted concurrently by other writers (CSV import, API
+insert, another job) as sourced, running paid enrichments on them; it was
+replaced by the additive `added_row_ids` key. Running all columns on every stale row would restore dependent
 values but discard this PR's cost-saving behavior for unrelated fresh cells.
 Running outputs during sourcing would introduce unrequested external dispatch.
 
@@ -26,9 +30,13 @@ Running outputs during sourcing would introduce unrequested external dispatch.
 
 Changed inputs propagate through derived columns while unrelated fresh cells
 remain intact. Explicitly non-reactive dependents stay excluded; outputs remain
-non-reactive by default and new-row initialization excludes outputs. Row-ID
-comparison adds two scoped ID reads and identifies rows added during the cycle.
-It is not a concurrent-writer snapshot isolation guarantee.
+non-reactive by default and new-row initialization excludes outputs.
+
+Resolved limitation: the snapshot diff was not concurrent-writer safe. Refresh
+now uses the IDs the source engine itself inserted, so rows added by another
+writer during sourcing are left alone (covered by
+`test_concurrently_inserted_row_is_not_treated_as_sourced`). No extra row-ID
+queries are issued.
 
 ## Validation
 

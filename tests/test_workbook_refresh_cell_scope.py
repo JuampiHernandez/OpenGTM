@@ -143,9 +143,9 @@ def test_refresh_recomputes_transitive_dependents_without_unrelated_spend(refres
     assert sent == []
 
 
-def test_new_source_row_runs_every_runnable_column_without_dispatch(refresh_runner, monkeypatch):
+def _sourced_workbook(sessions, monkeypatch, *, concurrent_row: bool):
+    """Workbook whose sourcing adds row 202; optionally another writer adds 303 meanwhile."""
     from apps.api.services.workbook import source_engine, http_column, research_column, agent_column
-    sessions, now, calls, sent = refresh_runner
     columns = [
         {"id": "source", "type": "source"},
         {"id": "email", "type": "input"},
@@ -169,8 +169,12 @@ def test_new_source_row_runs_every_runnable_column_without_dispatch(refresh_runn
         with sessions() as db:
             db.add(WorkbookRow(id=202, workbook_id=wid, workspace_id="refresh-scope", position=1,
                                data={"email": "new@example.test"}))
+            if concurrent_row:
+                # A CSV import / API insert landing while sourcing is in flight.
+                db.add(WorkbookRow(id=303, workbook_id=wid, workspace_id="refresh-scope", position=2,
+                                   data={"email": "imported@example.test"}))
             db.commit()
-        return {"added": 1}
+        return {"added": 1, "added_row_ids": [202]}
     async def http(*args, **kwargs):
         return {"value": "HTTP", "error": None}
     async def research(*args, **kwargs):
@@ -181,6 +185,12 @@ def test_new_source_row_runs_every_runnable_column_without_dispatch(refresh_runn
     monkeypatch.setattr(http_column, "execute_http_column", http)
     monkeypatch.setattr(research_column, "execute_research_column", research)
     monkeypatch.setattr(agent_column, "run_agent_cell", agent)
+    return wid
+
+
+def test_new_source_row_runs_every_runnable_column_without_dispatch(refresh_runner, monkeypatch):
+    sessions, now, calls, sent = refresh_runner
+    wid = _sourced_workbook(sessions, monkeypatch, concurrent_row=False)
     result = asyncio.run(refresh.refresh_workbook(wid, workspace_id="refresh-scope"))
     with sessions() as db:
         added = db.get(WorkbookRow, 202)
@@ -188,5 +198,24 @@ def test_new_source_row_runs_every_runnable_column_without_dispatch(refresh_runn
             "formula": "new@example.test", "http": "HTTP", "agent": "AGENT", "research": "RESEARCH"}
         assert db.get(WorkbookRow, 101).enrichments == {}
         assert "send" not in added.enrichments
+    assert result == {"sourced": 1, "reenriched": 4, "stale_rows": 1}
+    assert sent == calls == []
+
+
+def test_concurrently_inserted_row_is_not_treated_as_sourced(refresh_runner, monkeypatch):
+    """Only rows the refresh's own sourcing created get every column run.
+
+    A row another writer inserts while sourcing is in flight is not ours: the
+    scheduled refresh must not spend paid enrichments on it.
+    """
+    sessions, now, calls, sent = refresh_runner
+    wid = _sourced_workbook(sessions, monkeypatch, concurrent_row=True)
+    result = asyncio.run(refresh.refresh_workbook(wid, workspace_id="refresh-scope"))
+    with sessions() as db:
+        added = db.get(WorkbookRow, 202)
+        assert {cid: added.enrichments[cid]["value"] for cid in ("formula", "http", "agent", "research")} == {
+            "formula": "new@example.test", "http": "HTTP", "agent": "AGENT", "research": "RESEARCH"}
+        assert not db.get(WorkbookRow, 303).enrichments
+        assert not db.get(WorkbookRow, 101).enrichments
     assert result == {"sourced": 1, "reenriched": 4, "stale_rows": 1}
     assert sent == calls == []
