@@ -103,6 +103,19 @@ def test_all_fresh_cells_make_refresh_a_noop(refresh_runner, linked):
     assert calls == sent == []
 
 
+@pytest.mark.parametrize("linked", [False, True])
+def test_refresh_scope_is_independent_of_scan_page_size(refresh_runner, monkeypatch, linked):
+    from apps.api.core.config import settings
+
+    sessions, now, calls, sent = refresh_runner
+    monkeypatch.setattr(settings, "WORKBOOK_REFRESH_SCAN_BATCH_SIZE", 1)
+    wid = populate(sessions, now, linked)
+    result = asyncio.run(refresh.refresh_workbook(wid, workspace_id="refresh-scope"))
+    assert sorted(calls) == [("pitch {email}", "row202@example.test"),
+                             ("summary {email}", "row101@example.test")]
+    assert result == {"sourced": 0, "reenriched": 2, "stale_rows": 2}
+
+
 def test_refresh_recomputes_transitive_dependents_without_unrelated_spend(refresh_runner):
     sessions, now, calls, sent = refresh_runner
     columns = [

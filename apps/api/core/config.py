@@ -163,6 +163,12 @@ class Settings(BaseSettings):
     # Cloud deployments may populate this; comma-separated when set via env.
     AUTOMATIONS_WEBHOOK_DOMAIN_ALLOWLIST: list[str] = []
 
+    # ── Living workbook refresh ──
+    # Rows per keyset page when a refresh selects stale enrichment cells in SQL.
+    # Bounds memory/query size per round trip; every page is still scanned, so
+    # the selected cells do not depend on this value.
+    WORKBOOK_REFRESH_SCAN_BATCH_SIZE: int = 1000
+
     # ── Signal scanner (legacy hiring/JobSpy scan → unified ORM signals) ──
     # The scanner now iterates EVERY workspace and fans out provider I/O per
     # lead, so per-workspace and global caps keep a multi-tenant scan polite.
