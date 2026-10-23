@@ -11,6 +11,17 @@ from apps.api.services.leadgen.enrichment import domain_intel
 from apps.api.services.leadgen.enrichment.domain_intel import clean_domain
 
 
+_MALFORMED_URLS = [
+    "https://[",
+    "[example.com",
+    "https://example.com]",
+    "//[not-an-ip]",
+    "https://example.com\uff0fpath",
+    "example.com\uff1a443",
+    "//example.com\uff20evil.com",
+]
+
+
 @pytest.fixture
 def analyzed(monkeypatch):
     seen = []
@@ -36,6 +47,8 @@ def client():
 @pytest.mark.parametrize("raw,expected", [
     ("example.com", "example.com"),
     ("Example.COM", "example.com"),
+    ("//example.com", "example.com"),
+    ("//WWW.Example.com:8443/pricing?x=1#top", "example.com"),
     ("  www.Example.com. ", "example.com"),
     ("https://WWW.Example.com:8443/pricing?x=1#top", "example.com"),
     ("example.com/careers", "example.com"),
@@ -58,8 +71,13 @@ def test_clean_domain_rejects_what_is_not_a_hostname(raw):
     assert clean_domain(raw) == ""
 
 
-def test_route_analyzes_the_cleaned_domain(client, analyzed):
-    response = client.post("/api/leads/domain-intel", json={"domain": "https://WWW.Example.com/about"})
+@pytest.mark.parametrize("raw", [
+    "https://WWW.Example.com/about",
+    "//example.com",
+    "//WWW.Example.com:8443/pricing?x=1#top",
+])
+def test_route_analyzes_the_cleaned_domain(client, analyzed, raw):
+    response = client.post("/api/leads/domain-intel", json={"domain": raw})
 
     assert response.status_code == 200, response.text
     assert analyzed == ["example.com"]
@@ -76,6 +94,19 @@ def test_route_keeps_a_www_inside_the_name(client, analyzed):
 ])
 def test_route_rejects_input_that_is_not_a_domain(client, analyzed, body):
     response = client.post("/api/leads/domain-intel", json=body)
+
+    assert response.status_code == 400, response.text
+    assert analyzed == []
+
+
+@pytest.mark.parametrize("raw", _MALFORMED_URLS)
+def test_clean_domain_rejects_malformed_urls_without_raising(raw):
+    assert clean_domain(raw) == ""
+
+
+@pytest.mark.parametrize("raw", _MALFORMED_URLS)
+def test_route_rejects_malformed_urls_before_analysis(client, analyzed, raw):
+    response = client.post("/api/leads/domain-intel", json={"domain": raw})
 
     assert response.status_code == 400, response.text
     assert analyzed == []

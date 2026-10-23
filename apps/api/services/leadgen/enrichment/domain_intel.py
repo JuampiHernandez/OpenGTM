@@ -77,7 +77,11 @@ def clean_domain(value: object) -> str:
     text = value.strip()
     if not text:
         return ""
-    host = urlparse(text if "://" in text else "//" + text).hostname or ""
+    try:
+        url = text if "://" in text or text.startswith("//") else "//" + text
+        host = urlparse(url).hostname or ""
+    except ValueError:
+        return ""
     host = host.strip(".").lower()
     if host.startswith("www."):
         host = host[4:]
