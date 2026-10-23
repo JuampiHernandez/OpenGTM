@@ -5,9 +5,9 @@ description = "OpenGTM — open-source GTM agents for the world"
 requires-python = ">=3.11"
 dependencies = [
     # FastAPI stack
-    "fastapi>=0.143.0",
+    "fastapi>=0.150.0",
     "uvicorn[standard]>=0.54.0",
-    "sqlalchemy>=2.1.4",
+    "sqlalchemy>=2.1.5",
     "alembic>=1.20.0",
     # Postgres driver (psycopg3). Required for the default Postgres DATABASE_URL
     # and the shared, RLS-protected multi-tenant leads/signals store. The URL
@@ -16,18 +16,18 @@ dependencies = [
     # alembic ...` / `uv run python -m apps.api.scripts.seed_demo` work without
     # an ad-hoc `--with psycopg[binary]`. Mirrors apps/api/pyproject.toml.
     "psycopg[binary]>=3.3.6",
-    "pydantic-settings>=2.0.0",
+    "pydantic-settings>=2.16.0",
     "slowapi>=0.1.9",
     # Scraping & HTTP
     "beautifulsoup4>=4.12",
     "httpx>=0.28",
-    "aiohttp>=3.14.4",
+    "aiohttp>=3.14.5",
     "curl-cffi>=0.16.3",
     "lxml>=6.1.3",
     "markdownify>=1.2",
     "requests>=2.32",
     # Browser automation
-    "playwright>=1.63.0",
+    "playwright>=1.64.0",
     # Lead generation
     "ddgs>=9.16.0",
     "thefuzz>=0.22",
@@ -42,18 +42,18 @@ dependencies = [
     "dnspython>=2.9.0",
     "email-validator>=2.3.0",
     # LLM SDKs
-    "anthropic>=1.13.0",
+    "anthropic>=1.15.0",
     # Utilities
     "python-dotenv>=1.2.4",
     "logfire[fastapi]>=5.1.1",
     "aiofiles>=25.1.0",
     "duckduckgo-search>=8.1.1",
     "redis>=8.1.0",
-    "bullmq>=3.2.8",
+    "bullmq>=3.4.2",
     "pebble>=5.2.3",
     # Billing — Stripe credit top-ups (WI-9)
     "stripe>=16.0.0",
-    "authlib>=1.6.5",
+    "authlib>=1.9.1",
     "itsdangerous>=2.2.0",
 ]
 
@@ -66,7 +66,7 @@ dependencies = [
 #   - stealth-requests: curl_cffi session wrapper with built-in extractors (Tier 2).
 # curl-cffi itself is a core dependency above (Tier 2 TLS/JA3 impersonation).
 browser = [
-    "patchright>=1.63.0",
+    "patchright>=1.64.1",
     "stealth-requests>=1.2.0",
 ]
 
