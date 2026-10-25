@@ -16,10 +16,10 @@ Design contract:
     behavior is identical to today (DDG only).
   * Adapters never raise to the caller — a failing engine returns `[]` and the
     chain moves on. (Exceptions are logged at debug level.)
-  * Network access is wrapped in a tiny helper so tests can mock one place.
+  * Network access is wrapped in tiny GET/POST helpers so tests can mock them.
 
 Engine order (first configured one is tried first) is controlled by
-SEARCH_FALLBACK_ORDER, default "serpapi,bing,google_cse,brave,serpingapi,serply".
+SEARCH_FALLBACK_ORDER, default "serpapi,bing,google_cse,brave,serpingapi,serply,firecrawl".
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ logger = logging.getLogger("leadgen.search_engines")
 _ENGINE_TIMEOUT = float(os.getenv("SEARCH_ENGINE_TIMEOUT", "10"))
 
 # Default attempt order for keyed fallback engines.
-_DEFAULT_ORDER = "serpapi,bing,google_cse,brave,serpingapi,serply"
+_DEFAULT_ORDER = "serpapi,bing,google_cse,brave,serpingapi,serply,firecrawl"
 
 
 # ── Config (all optional) ────────────────────────────────────────────────
@@ -65,6 +65,10 @@ def _serply_key() -> str:
     return _key("SERPLY_API_KEY")
 
 
+def _firecrawl_key() -> str:
+    return _key("FIRECRAWL_API_KEY")
+
+
 # ── HTTP helper (single mockable seam) ───────────────────────────────────
 def _http_get_json(url: str, params: Dict, headers: Optional[Dict] = None) -> Optional[Dict]:
     """GET `url` and return parsed JSON, or None on any failure.
@@ -83,6 +87,26 @@ def _http_get_json(url: str, params: Dict, headers: Optional[Dict] = None) -> Op
         return resp.json()
     except Exception as e:  # noqa: BLE001 — adapters must never raise to caller
         logger.debug("search engine GET %s failed: %s", url, e)
+        return None
+
+
+def _http_post_json(url: str, body: Dict, headers: Optional[Dict] = None) -> Optional[Dict]:
+    """POST `body` as JSON to `url` and return parsed JSON, or None on any failure.
+
+    Same contract as `_http_get_json`, for engines that take the query in the
+    request body instead of the URL.
+    """
+    try:
+        import httpx
+
+        with httpx.Client(timeout=_ENGINE_TIMEOUT) as client:
+            resp = client.post(url, json=body, headers=headers or {})
+        if resp.status_code != 200:
+            logger.debug("search engine %s returned HTTP %s", url, resp.status_code)
+            return None
+        return resp.json()
+    except Exception as e:  # noqa: BLE001 — adapters must never raise to caller
+        logger.debug("search engine POST %s failed: %s", url, e)
         return None
 
 
@@ -244,6 +268,33 @@ def _serply(query: str, max_results: int) -> List[Dict]:
     return out
 
 
+def _firecrawl(query: str, max_results: int) -> List[Dict]:
+    key = _firecrawl_key()
+    if not key:
+        return []
+    data = _http_post_json(
+        "https://api.firecrawl.dev/v2/search",
+        # Firecrawl caps `limit` at 100 per request.
+        {"query": query, "limit": min(max_results, 100), "highlights": False, "origin": "opengtm"},
+        headers={"Authorization": f"Bearer {key}", "User-Agent": "OpenGTM"},
+    )
+    if not data:
+        return []
+    out: List[Dict] = []
+    for r in ((data.get("data") or {}).get("web") or []):
+        href = r.get("url") or ""
+        if not href.startswith(("http://", "https://")):
+            continue
+        out.append({
+            "title": r.get("title", "") or "",
+            "href": href,
+            "body": r.get("description", "") or "",
+        })
+        if len(out) >= max_results:
+            break
+    return out
+
+
 # name → (adapter, is_configured) registry
 _ADAPTERS: Dict[str, tuple[Callable[[str, int], List[Dict]], Callable[[], bool]]] = {
     "serpapi": (_serpapi, lambda: bool(_serpapi_key())),
@@ -252,6 +303,7 @@ _ADAPTERS: Dict[str, tuple[Callable[[str, int], List[Dict]], Callable[[], bool]]
     "brave": (_brave, lambda: bool(_brave_key())),
     "serpingapi": (_serpingapi, lambda: bool(_serpingapi_key())),
     "serply": (_serply, lambda: bool(_serply_key())),
+    "firecrawl": (_firecrawl, lambda: bool(_firecrawl_key())),
 }
 
 

@@ -58,8 +58,8 @@ def _clear_env(monkeypatch):
     for var in (
         "SERPAPI_KEY", "BING_SEARCH_KEY", "GOOGLE_CSE_ID",
         "GOOGLE_CSE_KEY", "BRAVE_SEARCH_KEY", "SERPINGAPI_API_KEY",
-        "SERPLY_API_KEY", "SEARCH_FALLBACK_ORDER", "SEARCH_ATTEMPT_ORDER", "SEARCH_BACKENDS",
-        "SEARCH_CACHE_ENABLED", "SEARCH_BACKOFF_ENABLED",
+        "SERPLY_API_KEY", "FIRECRAWL_API_KEY", "SEARCH_FALLBACK_ORDER", "SEARCH_ATTEMPT_ORDER",
+        "SEARCH_BACKENDS", "SEARCH_CACHE_ENABLED", "SEARCH_BACKOFF_ENABLED",
     ):
         monkeypatch.delenv(var, raising=False)
     _FakeDDGS.behavior = "empty"
@@ -118,15 +118,22 @@ def test_shape_parity_across_all_adapters(monkeypatch):
             {"SERPLY_API_KEY": "k"},
             {"results": [{"title": "F", "link": "https://f.example", "description": "sf", "position": 1}]},
         ),
+        "firecrawl": (
+            {"FIRECRAWL_API_KEY": "k"},
+            {"success": True, "data": {"web": [
+                {"title": "G", "url": "https://g.example", "description": "sg", "position": 1},
+            ]}},
+        ),
     }
     for engine, (env, json_body) in payloads.items():
         for var in ("SERPAPI_KEY", "BING_SEARCH_KEY", "GOOGLE_CSE_ID",
                     "GOOGLE_CSE_KEY", "BRAVE_SEARCH_KEY", "SERPINGAPI_API_KEY",
-                    "SERPLY_API_KEY"):
+                    "SERPLY_API_KEY", "FIRECRAWL_API_KEY"):
             monkeypatch.delenv(var, raising=False)
         for k, v in env.items():
             monkeypatch.setenv(k, v)
         monkeypatch.setattr(se, "_http_get_json", lambda *a, **k: json_body)
+        monkeypatch.setattr(se, "_http_post_json", lambda *a, **k: json_body)
         assert se.configured_engines() == [engine]
         results = se.search_fallback("q", max_results=5)
         assert len(results) == 1, engine
@@ -172,6 +179,44 @@ def test_serply_sends_key_header_and_caps_num(monkeypatch):
     assert seen["headers"]["X-Api-Key"] == "sk_test"
     assert "api_key" not in seen["params"] and "key" not in seen["params"]
     assert seen["params"]["num"] == 10
+
+
+def test_firecrawl_posts_query_with_bearer_key_and_caps_limit(monkeypatch):
+    """Firecrawl gets the query in a POST body and the key in the Authorization header."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    seen = {}
+
+    def fake_post(url, body, headers=None):
+        seen.update(url=url, body=body, headers=headers or {})
+        return {"success": True, "data": {"web": [
+            {"title": "G", "url": "https://g.example", "description": "sg", "position": 1},
+            {"title": "Not a URL", "url": "javascript:void(0)", "description": "x"},
+            {"title": "H", "url": "https://h.example", "description": "sh", "position": 2},
+        ]}}
+
+    def no_get(*a, **k):
+        raise AssertionError("firecrawl must not send the query in a GET URL")
+
+    monkeypatch.setattr(se, "_http_post_json", fake_post)
+    monkeypatch.setattr(se, "_http_get_json", no_get)
+    assert se.configured_engines() == ["firecrawl"]
+    results = se.search_fallback("site:example.com acme", max_results=500)
+    assert results == [
+        {"title": "G", "href": "https://g.example", "body": "sg"},
+        {"title": "H", "href": "https://h.example", "body": "sh"},
+    ]
+    assert seen["url"] == "https://api.firecrawl.dev/v2/search"
+    assert seen["headers"]["Authorization"] == "Bearer fc-test"
+    assert seen["body"]["query"] == "site:example.com acme"
+    assert seen["body"]["limit"] == 100
+    assert "fc-test" not in seen["url"] and "fc-test" not in str(seen["body"])
+    assert "scrapeOptions" not in seen["body"]
+    assert seen["body"]["highlights"] is False
+
+    assert se.search_fallback("q", max_results=1) == [
+        {"title": "G", "href": "https://g.example", "body": "sg"},
+    ]
+    assert seen["body"]["limit"] == 1
 
 
 def test_engine_order_respected(monkeypatch):
